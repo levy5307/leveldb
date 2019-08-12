@@ -12,7 +12,10 @@
 #include <vector>
 
 namespace leveldb {
-
+/** 内存分配器：
+ *    1.减少小内存分配的实际系统调用次数(减少new/delete的次数)
+ *    2.减少内存碎片
+ **/
 class Arena {
  public:
   Arena();
@@ -39,7 +42,9 @@ class Arena {
   char* AllocateNewBlock(size_t block_bytes);
 
   // Allocation state
+  /** 剩余内存起始地址 */
   char* alloc_ptr_;
+  /** 剩余内存数量(单位为byte) */
   size_t alloc_bytes_remaining_;
 
   // Array of new[] allocated memory blocks

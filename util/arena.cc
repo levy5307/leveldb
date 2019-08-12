@@ -18,6 +18,12 @@ Arena::~Arena() {
 }
 
 char* Arena::AllocateFallback(size_t bytes) {
+  /**
+   * 如果当前申请的内存大小大于kblocksize / 4，则为其单独分配一块内存，
+   * 否则则分配一个kblocksize的整块内存，共享使用
+   * 让大内存独占内存块的目的是为了避免大内存占据共享内存块过多, 更好的服务小内存，从而减少小内存的频繁系统调用。
+   * 因为小内存的new/delete操作更加频繁
+   **/
   if (bytes > kBlockSize / 4) {
     // Object is more than a quarter of our block size.  Allocate it separately
     // to avoid wasting too much space in leftover bytes.
@@ -26,6 +32,7 @@ char* Arena::AllocateFallback(size_t bytes) {
   }
 
   // We waste the remaining space in the current block.
+  /** 分配一整块的内存(kblocksize大小)，共享使用 */
   alloc_ptr_ = AllocateNewBlock(kBlockSize);
   alloc_bytes_remaining_ = kBlockSize;
 
@@ -36,10 +43,12 @@ char* Arena::AllocateFallback(size_t bytes) {
 }
 
 char* Arena::AllocateAligned(size_t bytes) {
+  /** 在32位系统中，align=4；64位系统下是8 */
   const int align = (sizeof(void*) > 8) ? sizeof(void*) : 8;
   static_assert((align & (align - 1)) == 0,
                 "Pointer size should be a power of 2");
   size_t current_mod = reinterpret_cast<uintptr_t>(alloc_ptr_) & (align - 1);
+  /** slop是为对其所牺牲的空间 */
   size_t slop = (current_mod == 0 ? 0 : align - current_mod);
   size_t needed = bytes + slop;
   char* result;
