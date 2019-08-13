@@ -19,6 +19,10 @@
 
 namespace leveldb {
 
+/**
+ * Fixed: 固定长度数字
+ * Varint: 变长数字，每一个byte用低7个字节来表示，第8个字节用于表示是否还有后续的部分, 对于大数，有可能用到5 Bytes
+ * */
 // Standard Put... routines append to a string
 void PutFixed32(std::string* dst, uint32_t value);
 void PutFixed64(std::string* dst, uint64_t value);
@@ -149,6 +153,7 @@ const char* GetVarint32PtrFallback(const char* p, const char* limit,
                                    uint32_t* value);
 inline const char* GetVarint32Ptr(const char* p, const char* limit,
                                   uint32_t* value) {
+  /** 这里处理的是该数字只有一个字节的情况, 个人感觉这里多此一举，直接调GetVarint32PtrFallback应该就可以了 */
   if (p < limit) {
     uint32_t result = *(reinterpret_cast<const uint8_t*>(p));
     if ((result & 128) == 0) {

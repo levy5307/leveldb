@@ -18,6 +18,16 @@ void PutFixed64(std::string* dst, uint64_t value) {
   dst->append(buf, sizeof(buf));
 }
 
+/**
+ *  ___________      ___________
+ * | 10010001  |    | 01110001  |
+ *  -----------      -----------
+ *     地址n            地址n+1
+ *  低地址的数字最高bit为1，代表下一个字节仍然是同一个数，高地址的数字的最高bit是0，代表下一个byte与当前不是同一个数
+ *  所以这里的数字是由这两个字节组成的
+ *
+ *  Note: 其实这里也可以像EncodeVarint64一样来写，更加简洁
+ **/
 char* EncodeVarint32(char* dst, uint32_t v) {
   // Operate on characters as unsigneds
   uint8_t* ptr = reinterpret_cast<uint8_t*>(dst);
@@ -69,11 +79,16 @@ void PutVarint64(std::string* dst, uint64_t v) {
   dst->append(buf, ptr - buf);
 }
 
+/**
+ * 格式：[length, data]
+ * 先写入长度，再写入内容
+ **/
 void PutLengthPrefixedSlice(std::string* dst, const Slice& value) {
   PutVarint32(dst, value.size());
   dst->append(value.data(), value.size());
 }
 
+/** 返回v所代表的变长数所占据的字节数量 */
 int VarintLength(uint64_t v) {
   int len = 1;
   while (v >= 128) {
@@ -113,6 +128,10 @@ bool GetVarint32(Slice* input, uint32_t* value) {
   }
 }
 
+/**
+ * 如果没有找到，返回null，
+ * 否则返回的是内存中存储该数字最后一个字节地址+1
+ **/
 const char* GetVarint64Ptr(const char* p, const char* limit, uint64_t* value) {
   uint64_t result = 0;
   for (uint32_t shift = 0; shift <= 63 && p < limit; shift += 7) {
@@ -134,9 +153,9 @@ bool GetVarint64(Slice* input, uint64_t* value) {
   const char* p = input->data();
   const char* limit = p + input->size();
   const char* q = GetVarint64Ptr(p, limit, value);
-  if (q == nullptr) {
+  if (q == nullptr) { /** 没有找到 */
     return false;
-  } else {
+  } else { /** 找到了，则从input中剪切掉该数字所占的空间 */
     *input = Slice(q, limit - q);
     return true;
   }
@@ -145,6 +164,11 @@ bool GetVarint64(Slice* input, uint64_t* value) {
 const char* GetLengthPrefixedSlice(const char* p, const char* limit,
                                    Slice* result) {
   uint32_t len;
+  /**
+   * 格式：[length, data]
+   * 先获取到length，此时p指向了data的起始地址，然后根据p和len生成result
+   * 最后返回的地址 = data最后一个字节地址+1
+   **/
   p = GetVarint32Ptr(p, limit, &len);
   if (p == nullptr) return nullptr;
   if (p + len > limit) return nullptr;
@@ -154,6 +178,12 @@ const char* GetLengthPrefixedSlice(const char* p, const char* limit,
 
 bool GetLengthPrefixedSlice(Slice* input, Slice* result) {
   uint32_t len;
+  /**
+   * 格式：[length, data]
+   * 1.根据GetVarint32得到长度(GetVarint32有个副作用是将input中的data向后移动，指向了data)
+   * 2.根据input中的data生成Slice
+   * 3.再从input中剪切掉data所占的空间
+   **/
   if (GetVarint32(input, &len) && input->size() >= len) {
     *result = Slice(input->data(), len);
     input->remove_prefix(len);
