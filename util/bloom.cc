@@ -14,6 +14,12 @@ static uint32_t BloomHash(const Slice& key) {
   return Hash(key.data(), key.size(), 0xbc9f1d34);
 }
 
+/**
+ * 利用位数组表示一个集合，并判断一个元素是否属于这个集合。但是有可能会把不属于这个集合的元素误认为属于这个集合　
+ * 本质上是利用极少的错误换区存储空间的极大节省
+ * 误判发生的情况，即：一个元素所对应的几个bit，都被其他元素占有，并且都被其他元素设置为了1，这时即使该元素不存在也会被误判为存在
+ * 参考文档：　https://blog.csdn.net/jiaomeng/article/details/1495500
+ **/
 class BloomFilterPolicy : public FilterPolicy {
  public:
   explicit BloomFilterPolicy(int bits_per_key) : bits_per_key_(bits_per_key) {
@@ -25,6 +31,7 @@ class BloomFilterPolicy : public FilterPolicy {
 
   const char* Name() const override { return "leveldb.BuiltinBloomFilter2"; }
 
+  /** 创建一个BloomFilter: keys表示元素集合，n表示元素个数，dst保存用于判断元素是否存在的bits */
   void CreateFilter(const Slice* keys, int n, std::string* dst) const override {
     // Compute bloom filter size (in both bits and bytes)
     size_t bits = n * bits_per_key_;
@@ -33,30 +40,39 @@ class BloomFilterPolicy : public FilterPolicy {
     // by enforcing a minimum bloom filter length.
     if (bits < 64) bits = 64;
 
+    /** 获取bytes，并利用bytes反推出bits，使bits是8的整数倍 */
     size_t bytes = (bits + 7) / 8;
     bits = bytes * 8;
 
+    /** 先扩容, 扩充的空间存放所有的用于表示元素存在与否的bits */
     const size_t init_size = dst->size();
     dst->resize(init_size + bytes, 0);
+
+    /** dst最后保存k_，在判断元素是否存在时，用于获取k_的值 */
     dst->push_back(static_cast<char>(k_));  // Remember # of probes in filter
+
+    /** 对每个元素，循环执行插入（即对其hash得到的k_个bit置1） */
     char* array = &(*dst)[init_size];
     for (int i = 0; i < n; i++) {
       // Use double-hashing to generate a sequence of hash values.
       // See analysis in [Kirsch,Mitzenmacher 2006].
       uint32_t h = BloomHash(keys[i]);
+      /** 循环右移动17位 */
       const uint32_t delta = (h >> 17) | (h << 15);  // Rotate right 17 bits
       for (size_t j = 0; j < k_; j++) {
         const uint32_t bitpos = h % bits;
-        array[bitpos / 8] |= (1 << (bitpos % 8));
+        array[bitpos / 8] |= (1 << (bitpos % 8)); /** 对其对应的bit置1 */
         h += delta;
       }
     }
   }
 
   bool KeyMayMatch(const Slice& key, const Slice& bloom_filter) const override {
+    /** len < 2，则保存的bits数则为0（因为最末尾有一个k_，所以即使len == 1也不对） */
     const size_t len = bloom_filter.size();
     if (len < 2) return false;
 
+    /** 获取bits数 */
     const char* array = bloom_filter.data();
     const size_t bits = (len - 1) * 8;
 
@@ -71,6 +87,7 @@ class BloomFilterPolicy : public FilterPolicy {
 
     uint32_t h = BloomHash(key);
     const uint32_t delta = (h >> 17) | (h << 15);  // Rotate right 17 bits
+    /** 分别对这k个hash值进行判断，只要有一个不是1，则表示元素不存在 */
     for (size_t j = 0; j < k; j++) {
       const uint32_t bitpos = h % bits;
       if ((array[bitpos / 8] & (1 << (bitpos % 8))) == 0) return false;
@@ -80,6 +97,7 @@ class BloomFilterPolicy : public FilterPolicy {
   }
 
  private:
+  /** 每个元素占据几个bit,　查找时如果这几个bit都是1，则表示元素存在 */
   size_t bits_per_key_;
   size_t k_;
 };
