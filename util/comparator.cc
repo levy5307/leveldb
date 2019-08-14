@@ -24,10 +24,17 @@ class BytewiseComparatorImpl : public Comparator {
 
   const char* Name() const override { return "leveldb.BytewiseComparator"; }
 
+  /** 重构Compare函数 */
   int Compare(const Slice& a, const Slice& b) const override {
     return a.compare(b);
   }
 
+  /**
+   * 找出[start, limit]区间内的一个最小的短串
+   * 例如：start = [80, 86, 88, 99, 20]
+   *      limit = [80, 86, 90]
+   * 找出的最小短串是[80, 85, 89]
+   */
   void FindShortestSeparator(std::string* start,
                              const Slice& limit) const override {
     // Find length of common prefix
@@ -51,6 +58,10 @@ class BytewiseComparatorImpl : public Comparator {
     }
   }
 
+  /**
+   * 寻找第一个可以+1的(也就是 < 255)byte, 然后对该byte加一，并将key剪切到该byte
+   * 也就是找到该key的最小的后继，例如 [255, 255，121，80]的最小的后继是[255, 255, 122]
+   * */
   void FindShortSuccessor(std::string* key) const override {
     // Find first character that can be incremented
     size_t n = key->size();
@@ -67,6 +78,7 @@ class BytewiseComparatorImpl : public Comparator {
 };
 }  // namespace
 
+/** 这种singleton的实现方式是线程安全的 */
 const Comparator* BytewiseComparator() {
   static NoDestructor<BytewiseComparatorImpl> singleton;
   return singleton.get();
