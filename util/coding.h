@@ -63,6 +63,12 @@ char* EncodeVarint64(char* dst, uint64_t value);
 // Lower-level versions of Put... that write directly into a character buffer
 // REQUIRES: dst has enough space for the value being written
 
+/**
+ * DecodeFixed中的平台无关代码，对于clang和gcc情况下都做了优化(优化成了单个mov/ldr指令),
+ * 但是EncodeFixed中的平台无关代码只有在gcc情况下做了优化(即clang对于store操作的支持不够优秀)
+ * 但是两者（DecodeFixed和EncodeFixed中的平台无关代码）对于msvc都没有做优化（msvc是微软的VC编译器）
+ * 可以从如下网址查看到编译后形成的汇编代码： https://godbolt.org/z/45S0ID
+ **/
 inline void EncodeFixed32(char* dst, uint32_t value) {
   uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
 
@@ -73,6 +79,11 @@ inline void EncodeFixed32(char* dst, uint32_t value) {
     return;
   }
 
+  /**
+   * 只有gcc情况下对下述平台无关操作做了优化（优化成了单个的mov/ldr指令）, 其他情况下并未做优化
+   * 为了尽可能提高效率，才有了上面的对little endian的特殊处理（因为在littlen endian情况下，memcpy做了优化）
+   * 否则，就可以直接使用下述平台（big endian/little endian）无关代码
+   **/
   // Platform-independent code.
   // Currently, only gcc optimizes this to a single mov / str instruction.
   buffer[0] = static_cast<uint8_t>(value);
