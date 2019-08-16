@@ -21,6 +21,12 @@ namespace leveldb {
 
 namespace {
 
+/**
+ * 线程安全的内存文件控制结构(纯内存，无持久化)
+ * 文件是由大小为kBlockSize的block组成的vector存储数据
+ * size_表示文件当前大小
+ * mutex控制互斥访问
+ **/
 class FileState {
  public:
   // FileStates are reference counted. The initial reference count is zero
@@ -150,6 +156,7 @@ class FileState {
   uint64_t size_ GUARDED_BY(blocks_mutex_);
 };
 
+/** 顺序访问文件，多了一个当前访问position变量 */
 class SequentialFileImpl : public SequentialFile {
  public:
   explicit SequentialFileImpl(FileState* file) : file_(file), pos_(0) {
@@ -183,6 +190,7 @@ class SequentialFileImpl : public SequentialFile {
   uint64_t pos_;
 };
 
+/** 随机访问文件 */
 class RandomAccessFileImpl : public RandomAccessFile {
  public:
   explicit RandomAccessFileImpl(FileState* file) : file_(file) { file_->Ref(); }
@@ -219,6 +227,7 @@ class NoOpLogger : public Logger {
   void Logv(const char* format, va_list ap) override {}
 };
 
+/** 封装对于各种file(Writeable, Readable, RandomAccess, Sequential)的各种操作 */
 class InMemoryEnv : public EnvWrapper {
  public:
   explicit InMemoryEnv(Env* base_env) : EnvWrapper(base_env) {}
@@ -232,6 +241,7 @@ class InMemoryEnv : public EnvWrapper {
   // Partial implementation of the Env interface.
   Status NewSequentialFile(const std::string& fname,
                            SequentialFile** result) override {
+    /** 不存在直接返回，因为是读，如果文件都找不到，就更不能读了，直接返回错误 */
     MutexLock lock(&mutex_);
     if (file_map_.find(fname) == file_map_.end()) {
       *result = nullptr;
@@ -244,6 +254,7 @@ class InMemoryEnv : public EnvWrapper {
 
   Status NewRandomAccessFile(const std::string& fname,
                              RandomAccessFile** result) override {
+    /** 不存在直接返回，因为是读，如果文件都找不到，就更不能读了，直接返回错误 */
     MutexLock lock(&mutex_);
     if (file_map_.find(fname) == file_map_.end()) {
       *result = nullptr;
@@ -259,6 +270,7 @@ class InMemoryEnv : public EnvWrapper {
     MutexLock lock(&mutex_);
     FileSystem::iterator it = file_map_.find(fname);
 
+    /** 不存在则创建；存在则清空 */
     FileState* file;
     if (it == file_map_.end()) {
       // File is not currently open.
@@ -274,6 +286,7 @@ class InMemoryEnv : public EnvWrapper {
     return Status::OK();
   }
 
+  /** 个人认为这里的实现由问题, 最后创建的FileState并没有保存入file_map_ */
   Status NewAppendableFile(const std::string& fname,
                            WritableFile** result) override {
     MutexLock lock(&mutex_);
@@ -292,6 +305,7 @@ class InMemoryEnv : public EnvWrapper {
     return file_map_.find(fname) != file_map_.end();
   }
 
+  // 在所有的filename中查找前缀为"$dir/"的文件名字
   Status GetChildren(const std::string& dir,
                      std::vector<std::string>* result) override {
     MutexLock lock(&mutex_);
