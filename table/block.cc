@@ -30,6 +30,10 @@ Block::Block(const BlockContents& contents)
     size_ = 0;  // Error marker
   } else {
     size_t max_restarts_allowed = (size_ - sizeof(uint32_t)) / sizeof(uint32_t);
+    /**
+     * restart num字段保存的值(restart offset数量) > 整个空间最大可容纳的restart offset数量，
+     * 说明空间太小
+     * */
     if (NumRestarts() > max_restarts_allowed) {
       // The size is too small for NumRestarts()
       size_ = 0;
@@ -52,6 +56,10 @@ Block::~Block() {
 //
 // If any errors are detected, returns nullptr.  Otherwise, returns a
 // pointer to the key delta (just past the three decoded values).
+/**
+ * entry格式：
+ * key共享长度 | key非共享长度 | value长度 | key非共享内容 | value内容
+ **/
 static inline const char* DecodeEntry(const char* p, const char* limit,
                                       uint32_t* shared, uint32_t* non_shared,
                                       uint32_t* value_length) {
@@ -59,6 +67,10 @@ static inline const char* DecodeEntry(const char* p, const char* limit,
   *shared = reinterpret_cast<const uint8_t*>(p)[0];
   *non_shared = reinterpret_cast<const uint8_t*>(p)[1];
   *value_length = reinterpret_cast<const uint8_t*>(p)[2];
+  /**
+   * 如果所有的shared/non_shared/value_length都只占一个字节(<128), 则说明上述代码解析对了，
+   * 否则，则需要重新按照可变长度分别解析这三个值
+   * */
   if ((*shared | *non_shared | *value_length) < 128) {
     // Fast path: all three values are encoded in one byte each
     p += 3;
@@ -68,6 +80,10 @@ static inline const char* DecodeEntry(const char* p, const char* limit,
     if ((p = GetVarint32Ptr(p, limit, value_length)) == nullptr) return nullptr;
   }
 
+  /**
+   * 如果内存中实际的数据长度小于*non_shared(key非共享长度) + *value_length(value长度)，
+   * 则说明这个entry有问题，要么长度字段记录有问题，要么数据不够多
+   **/
   if (static_cast<uint32_t>(limit - p) < (*non_shared + *value_length)) {
     return nullptr;
   }
@@ -78,7 +94,9 @@ class Block::Iter : public Iterator {
  private:
   const Comparator* const comparator_;
   const char* const data_;       // underlying block contents
+  /** restart的偏移 */
   uint32_t const restarts_;      // Offset of restart array (list of fixed32)
+  /** restart的数量 */
   uint32_t const num_restarts_;  // Number of uint32_t entries in restart array
 
   // current_ is offset in data_ of current entry.  >= restarts_ if !Valid
@@ -93,15 +111,18 @@ class Block::Iter : public Iterator {
   }
 
   // Return the offset in data_ just past the end of the current entry.
+  /** 下一个entry的offset */
   inline uint32_t NextEntryOffset() const {
     return (value_.data() + value_.size()) - data_;
   }
 
+  /** 找到第index个（c[index]）entry在data_中的偏移 */
   uint32_t GetRestartPoint(uint32_t index) {
     assert(index < num_restarts_);
     return DecodeFixed32(data_ + restarts_ + index * sizeof(uint32_t));
   }
 
+  /** 找到第index个[c[index]entry的值 */
   void SeekToRestartPoint(uint32_t index) {
     key_.clear();
     restart_index_ = index;
@@ -144,6 +165,7 @@ class Block::Iter : public Iterator {
     assert(Valid());
 
     // Scan backwards to a restart point before current_
+    /** 向前移动restart_index，直到其起始地点 < current_ */
     const uint32_t original = current_;
     while (GetRestartPoint(restart_index_) >= original) {
       if (restart_index_ == 0) {
@@ -155,6 +177,7 @@ class Block::Iter : public Iterator {
       restart_index_--;
     }
 
+    /** 定位到restart_index_指向的entry */
     SeekToRestartPoint(restart_index_);
     do {
       // Loop until end of current entry hits the start of original entry
@@ -223,6 +246,7 @@ class Block::Iter : public Iterator {
   }
 
   bool ParseNextKey() {
+      /** 获取下一个entry的offet，如果其地址已经超越了restart的地址，则返回出错 */
     current_ = NextEntryOffset();
     const char* p = data_ + current_;
     const char* limit = data_ + restarts_;  // Restarts come right after data
@@ -234,15 +258,20 @@ class Block::Iter : public Iterator {
     }
 
     // Decode next entry
+    /** 解析下一个entry */
     uint32_t shared, non_shared, value_length;
     p = DecodeEntry(p, limit, &shared, &non_shared, &value_length);
     if (p == nullptr || key_.size() < shared) {
       CorruptionError();
       return false;
     } else {
+      /** 保留shared空间 */
       key_.resize(shared);
+      /** 追加non_shared字段 */
       key_.append(p, non_shared);
+      /** 获取value */
       value_ = Slice(p + non_shared, value_length);
+      /** 设置restart_inext */
       while (restart_index_ + 1 < num_restarts_ &&
              GetRestartPoint(restart_index_ + 1) < current_) {
         ++restart_index_;

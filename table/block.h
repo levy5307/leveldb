@@ -15,6 +15,17 @@ namespace leveldb {
 struct BlockContents;
 class Comparator;
 
+/**
+ * 格式：
+ * _______________________________________________________________________
+ * | c1 | c2 | c3 | c1 restart | c2 restart | c3 restart | restart num |
+ * -----------------------------------------------------------------------
+ * c(n) restart代表c(n)的偏移。需要使用偏移是因为c1/c2/c3等长度不一
+ * restart num代表restart的数量或者crc信息。上图记录了restart数量
+ *
+ * c(n) entry格式：
+ * key共享长度 | key非共享长度 | value长度 | key非共享内容 | value内容
+ **/
 class Block {
  public:
   // Initialize the block with the specified contents.
@@ -36,6 +47,7 @@ class Block {
   const char* data_;
   size_t size_;
   uint32_t restart_offset_;  // Offset in data_ of restart array
+  /** data_是否自己拥有，也就是说data_字段是否需要自己释放 */
   bool owned_;               // Block owns data_[]
 };
 
