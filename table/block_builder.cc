@@ -61,6 +61,7 @@ size_t BlockBuilder::CurrentSizeEstimate() const {
 
 Slice BlockBuilder::Finish() {
   // Append restart array
+  /** 将restarts_数组放入buffer_中，并将restarts_的size()放入最后 */
   for (size_t i = 0; i < restarts_.size(); i++) {
     PutFixed32(&buffer_, restarts_[i]);
   }
@@ -76,13 +77,14 @@ void BlockBuilder::Add(const Slice& key, const Slice& value) {
   assert(buffer_.empty()  // No values yet?
          || options_->comparator->Compare(key, last_key_piece) > 0);
   size_t shared = 0;
-  if (counter_ < options_->block_restart_interval) {
+  if (counter_ < options_->block_restart_interval) { /** 不需要插入restart_节点, 则找到共享部分长度 */
     // See how much sharing to do with previous string
+    /** 找到共享部分的长度, 共享长度是指两个相邻的key的共享数据部分，这部分数据不用保存多份 */
     const size_t min_length = std::min(last_key_piece.size(), key.size());
     while ((shared < min_length) && (last_key_piece[shared] == key[shared])) {
       shared++;
     }
-  } else {
+  } else { /** 否则，插入restart节点。此时新插入的entry是该restart节点起始的一个entry，所以无需像上面找到shared */
     // Restart compression
     restarts_.push_back(buffer_.size());
     counter_ = 0;

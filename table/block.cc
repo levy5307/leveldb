@@ -122,7 +122,7 @@ class Block::Iter : public Iterator {
     return DecodeFixed32(data_ + restarts_ + index * sizeof(uint32_t));
   }
 
-  /** 找到第index个[c[index]entry的值 */
+  /** 找到第index个[c[index]entry的值存入value_ */
   void SeekToRestartPoint(uint32_t index) {
     key_.clear();
     restart_index_ = index;
@@ -177,7 +177,11 @@ class Block::Iter : public Iterator {
       restart_index_--;
     }
 
-    /** 定位到restart_index_指向的entry */
+    /**
+     * 定位到restart_index_指向的entry:
+     * 因为SeekToRestartPoint没有更改current_，ParseNextKey第一行先解析获取了current_, 其指向的是restart_index这个entry
+     * 所以遍历过程还是从restart_index这个entry开始
+     **/
     SeekToRestartPoint(restart_index_);
     do {
       // Loop until end of current entry hits the start of original entry
@@ -246,7 +250,7 @@ class Block::Iter : public Iterator {
   }
 
   bool ParseNextKey() {
-      /** 获取下一个entry的offet，如果其地址已经超越了restart的地址，则返回出错 */
+    /** 获取下一个entry的offet，如果其地址已经超越了restart的地址，则返回出错 */
     current_ = NextEntryOffset();
     const char* p = data_ + current_;
     const char* limit = data_ + restarts_;  // Restarts come right after data
