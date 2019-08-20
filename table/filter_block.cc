@@ -44,10 +44,11 @@ void FilterBlockBuilder::AddKey(const Slice& key) {
  *  |      filter offset 2
  *  |           ...
  *  |      filter offset n
- *  |    beginning of filter offset
+ *  |  beginning of filter offset
  *  V          base
  **/
 Slice FilterBlockBuilder::Finish() {
+  /** 先根据keys_中的所有key生成一个filter block */
   if (!start_.empty()) {
     GenerateFilter();
   }
@@ -74,6 +75,7 @@ void FilterBlockBuilder::GenerateFilter() {
   const size_t num_keys = start_.size();
   if (num_keys == 0) {
     // Fast path if there are no keys for this filter
+    /** 快速方式，也可以删掉这里的分支判断，直接走下面的流程，逻辑相同 */
     filter_offsets_.push_back(result_.size());
     return;
   }
