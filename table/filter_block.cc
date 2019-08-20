@@ -26,24 +26,46 @@ void FilterBlockBuilder::StartBlock(uint64_t block_offset) {
   }
 }
 
+/** 加入key */
 void FilterBlockBuilder::AddKey(const Slice& key) {
   Slice k = key;
   start_.push_back(keys_.size());
   keys_.append(k.data(), k.size());
 }
 
+/**
+ * 把数据拼装起来并返回
+ * result最终格式：
+ *  |      filter block 1
+ *  |      filter block 2
+ *  |           ...
+ *  |      filter block n
+ *  |      filter offset 1
+ *  |      filter offset 2
+ *  |           ...
+ *  |      filter offset n
+ *  |    beginning of filter offset
+ *  V          base
+ **/
 Slice FilterBlockBuilder::Finish() {
   if (!start_.empty()) {
     GenerateFilter();
   }
 
   // Append array of per-filter offsets
+  /**
+   * 在执行Finishz之前，result_中就已经存储了各个生成的filter block
+   * append各个filter offset到result_中
+   **/
   const uint32_t array_offset = result_.size();
   for (size_t i = 0; i < filter_offsets_.size(); i++) {
     PutFixed32(&result_, filter_offsets_[i]);
   }
 
+  /** Append result_加入所有filter offset之前的长度（即：所有filter block的长度和）*/
   PutFixed32(&result_, array_offset);
+
+  /** Append base */
   result_.push_back(kFilterBaseLg);  // Save encoding parameter in result
   return Slice(result_);
 }
@@ -58,6 +80,7 @@ void FilterBlockBuilder::GenerateFilter() {
 
   // Make list of keys from flattened key structure
   start_.push_back(keys_.size());  // Simplify length computation
+  /** temp_keys是从keys_中，根据start_（即各个key的偏移）计算得来的keys数组 */
   tmp_keys_.resize(num_keys);
   for (size_t i = 0; i < num_keys; i++) {
     const char* base = keys_.data() + start_[i];
@@ -66,7 +89,10 @@ void FilterBlockBuilder::GenerateFilter() {
   }
 
   // Generate filter for current set of keys and append to result_.
+  /** 获取当前filter block的offset，存入filter_offsets_中 */
   filter_offsets_.push_back(result_.size());
+
+  /** 根据num_keys个key创建一个filter block，追加到result_中 */
   policy_->CreateFilter(&tmp_keys_[0], static_cast<int>(num_keys), &result_);
 
   tmp_keys_.clear();
@@ -79,19 +105,25 @@ FilterBlockReader::FilterBlockReader(const FilterPolicy* policy,
     : policy_(policy), data_(nullptr), offset_(nullptr), num_(0), base_lg_(0) {
   size_t n = contents.size();
   if (n < 5) return;  // 1 byte for base_lg_ and 4 for start of offset array
+  /** base_lg_ = 途中的base处保存的值 */
   base_lg_ = contents[n - 1];
+  /** 这里的last_word = beginning of filter offset处保存的值，data_ + last_word = filter offset 1的地址 */
   uint32_t last_word = DecodeFixed32(contents.data() + n - 5);
   if (last_word > n - 5) return;
   data_ = contents.data();
   offset_ = data_ + last_word;
+  /** 通过计算filter offset的数量, 得到filter的数量 */
   num_ = (n - 5 - last_word) / 4;
 }
 
 bool FilterBlockReader::KeyMayMatch(uint64_t block_offset, const Slice& key) {
+  /** 先根据block_offset和base_lg_解析出filter block的index */
   uint64_t index = block_offset >> base_lg_;
   if (index < num_) {
+    /** 解析得到filter block的开始offset和结束offset */
     uint32_t start = DecodeFixed32(offset_ + index * 4);
     uint32_t limit = DecodeFixed32(offset_ + index * 4 + 4);
+    /** limit必须小于filter offset(因为不管是start还是limit都是在filter block区间的，不可能超越filter offset这个区间) */
     if (start <= limit && limit <= static_cast<size_t>(offset_ - data_)) {
       Slice filter = Slice(data_ + start, limit - start);
       return policy_->KeyMayMatch(key, filter);
