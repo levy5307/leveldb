@@ -34,8 +34,8 @@ struct ReadOptions;
  ****************************************************
  *
  * Footer的格式：
- *      offset    size        (metaindex_handle)
- *      offset    size        (index_handle)
+ *      offset    size        (metaindex_handle: data block index)
+ *      offset    size        (index_handle: meta block index)
  *          padding
  *          magic             (8Bytes litten-endian)
  **/
@@ -89,7 +89,9 @@ class Footer {
   Status DecodeFrom(Slice* input);
 
  private:
+  /** 数据区(data block)索引 */
   BlockHandle metaindex_handle_;
+  /** mata block索引 */
   BlockHandle index_handle_;
 };
 
