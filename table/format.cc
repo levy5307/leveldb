@@ -40,6 +40,7 @@ void Footer::EncodeTo(std::string* dst) const {
 }
 
 Status Footer::DecodeFrom(Slice* input) {
+  /** 解析获得magic, 并与kTableMagicNumber对比是否相等 */
   const char* magic_ptr = input->data() + kEncodedLength - 8;
   const uint32_t magic_lo = DecodeFixed32(magic_ptr);
   const uint32_t magic_hi = DecodeFixed32(magic_ptr + 4);
@@ -49,12 +50,14 @@ Status Footer::DecodeFrom(Slice* input) {
     return Status::Corruption("not an sstable (bad magic number)");
   }
 
+  /** 解析meta index block与index block */
   Status result = metaindex_handle_.DecodeFrom(input);
   if (result.ok()) {
     result = index_handle_.DecodeFrom(input);
   }
   if (result.ok()) {
     // We skip over any leftover data (just padding for now) in "input"
+    /** 将从input中解析完的数据剪切掉 */
     const char* end = magic_ptr + 8;
     *input = Slice(end, input->data() + input->size() - end);
   }

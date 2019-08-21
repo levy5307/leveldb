@@ -19,8 +19,29 @@ class Block;
 class RandomAccessFile;
 struct ReadOptions;
 
+/**
+ * SSTable文件格式：
+ *      Data Block 1
+ *      Data Block 2
+ *          ...
+ *      Meta Block 1
+ *      Meta Block 2
+ *          ...
+ *    Meta Index Block
+ *       Index Block
+ *         Footer
+ *
+ ****************************************************
+ *
+ * Footer的格式：
+ *      offset    size        (metaindex_handle)
+ *      offset    size        (index_handle)
+ *          padding
+ *          magic             (8Bytes litten-endian)
+ **/
 // BlockHandle is a pointer to the extent of a file that stores a data
 // block or a meta block.
+/** 存储block的元信息（offset/size）, 是Footer的一部分 */
 class BlockHandle {
  public:
   // Maximum encoding length of a BlockHandle
@@ -46,6 +67,7 @@ class BlockHandle {
 
 // Footer encapsulates the fixed information stored at the tail
 // end of every table file.
+/** 存储meta index block与index block在sstable中的索引信息, 另外尾部还会存储一个8字节长的magic word */
 class Footer {
  public:
   // Encoded length of a Footer.  Note that the serialization of a
@@ -79,6 +101,7 @@ static const uint64_t kTableMagicNumber = 0xdb4775248b80fb57ull;
 // 1-byte type + 32-bit crc
 static const size_t kBlockTrailerSize = 5;
 
+/** 保存了来自Block::Finish返回的block数据 */
 struct BlockContents {
   Slice data;           // Actual contents of data
   bool cachable;        // True iff data can be cached
