@@ -10,6 +10,24 @@
 
 namespace leveldb {
 
+/**
+ * 结构图：
+ *  管理n个iterator（child）, 每个iterator指向一列元素。
+ *  支持:
+ *      1.查找这n个iterator所有指向的元素的最小key
+ *      1.查找这n个iterator所有指向的元素的最大key
+ *      2.查找当前指向元素的下一个(比其key值大)元素
+ *      3.查找当前指向元素的前一个(比其key值小)元素
+ *
+ *   __  升序         ___                  ___
+ *  |__|  |          |__|            .    |__|
+ *  |__|  |          |__|            .    |__|<--child(n-1)
+ *  |__|  V          |__|            .    |__|
+ *  |__| <--child0   |__|            .    |__|
+ *  |__|             |__|            .    |__|
+ *  |__|             |__|<--child1   .    |__|
+ *  |__|             |__|                 |__|
+ **/
 namespace {
 class MergingIterator : public Iterator {
  public:
@@ -29,29 +47,39 @@ class MergingIterator : public Iterator {
   bool Valid() const override { return (current_ != nullptr); }
 
   void SeekToFirst() override {
+    /** 所有的child都seek to fist, 并令current_指向最小的child */
     for (int i = 0; i < n_; i++) {
       children_[i].SeekToFirst();
     }
     FindSmallest();
+
+    /** 令行进方向=向前 */
     direction_ = kForward;
   }
 
   void SeekToLast() override {
+    /** 所有的child都seek to last, 并令current_指向最大的child */
     for (int i = 0; i < n_; i++) {
       children_[i].SeekToLast();
     }
     FindLargest();
+
+    /** 令行进方向=向后 */
     direction_ = kReverse;
   }
 
   void Seek(const Slice& target) override {
+    /** 所有的child都指向target, 并令current_指向最小的child */
     for (int i = 0; i < n_; i++) {
       children_[i].Seek(target);
     }
     FindSmallest();
+
+    /** 令行进方向=向前 */
     direction_ = kForward;
   }
 
+  /** 用于在所有child中寻找，比current_的key大的下一个iterator */
   void Next() override {
     assert(Valid());
 
@@ -60,6 +88,11 @@ class MergingIterator : public Iterator {
     // true for all of the non-current_ children since current_ is
     // the smallest child and key() == current_->key().  Otherwise,
     // we explicitly position the non-current_ children.
+    /**
+     * 如果当前direction是kForward，则说明所有的child都指向最小，并且current是所有child中最小的iterator,
+     * 直接令current往前走一步，并在所有child中再找最小;
+     * 否则，令所有child指向比current->key大的iterator，并在所有child中再取最小
+     * */
     if (direction_ != kForward) {
       for (int i = 0; i < n_; i++) {
         IteratorWrapper* child = &children_[i];
@@ -117,6 +150,7 @@ class MergingIterator : public Iterator {
     return current_->value();
   }
 
+  /** 只要有一个child的status不是ok, 就返回not ok */
   Status status() const override {
     Status status;
     for (int i = 0; i < n_; i++) {
@@ -145,7 +179,7 @@ class MergingIterator : public Iterator {
   Direction direction_;
 };
 
-/** 查找key最小的iterator */
+/** 查找key最小的child, 令curren_指向它 */
 void MergingIterator::FindSmallest() {
   IteratorWrapper* smallest = nullptr;
   for (int i = 0; i < n_; i++) {
@@ -161,7 +195,7 @@ void MergingIterator::FindSmallest() {
   current_ = smallest;
 }
 
-/** 查找key最大的iterator */
+/** 查找key最大的child, 令curren_指向它 */
 void MergingIterator::FindLargest() {
   IteratorWrapper* largest = nullptr;
   for (int i = n_ - 1; i >= 0; i--) {
@@ -178,6 +212,7 @@ void MergingIterator::FindLargest() {
 }
 }  // namespace
 
+/** 创建一个新的MergingIterator */
 Iterator* NewMergingIterator(const Comparator* comparator, Iterator** children,
                              int n) {
   assert(n >= 0);
