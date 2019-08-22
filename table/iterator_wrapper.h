@@ -25,6 +25,7 @@ class IteratorWrapper {
   // when Set() is invoked again.
   void Set(Iterator* iter) {
     delete iter_;
+    /** 更新iter_并根据iter更新key_和value_ */
     iter_ = iter;
     if (iter_ == nullptr) {
       valid_ = false;
@@ -82,7 +83,9 @@ class IteratorWrapper {
     }
   }
 
+  /** 当前iterator */
   Iterator* iter_;
+  /** 当前iterator所指向的key和value */
   bool valid_;
   Slice key_;
 };

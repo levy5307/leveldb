@@ -12,6 +12,7 @@ Iterator::Iterator() {
 }
 
 Iterator::~Iterator() {
+  /** 依次执行cleanupNode并删除 */
   if (!cleanup_head_.IsEmpty()) {
     cleanup_head_.Run();
     for (CleanupNode* node = cleanup_head_.next; node != nullptr;) {
@@ -23,6 +24,7 @@ Iterator::~Iterator() {
   }
 }
 
+/** 向链表头部添加cleanup */
 void Iterator::RegisterCleanup(CleanupFunction func, void* arg1, void* arg2) {
   assert(func != nullptr);
   CleanupNode* node;

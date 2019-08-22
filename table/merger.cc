@@ -135,16 +135,17 @@ class MergingIterator : public Iterator {
   void FindSmallest();
   void FindLargest();
 
+  const Comparator* comparator_;
   // We might want to use a heap in case there are lots of children.
   // For now we use a simple array since we expect a very small number
   // of children in leveldb.
-  const Comparator* comparator_;
   IteratorWrapper* children_;
   int n_;
   IteratorWrapper* current_;
   Direction direction_;
 };
 
+/** 查找key最小的iterator */
 void MergingIterator::FindSmallest() {
   IteratorWrapper* smallest = nullptr;
   for (int i = 0; i < n_; i++) {
@@ -160,6 +161,7 @@ void MergingIterator::FindSmallest() {
   current_ = smallest;
 }
 
+/** 查找key最大的iterator */
 void MergingIterator::FindLargest() {
   IteratorWrapper* largest = nullptr;
   for (int i = n_ - 1; i >= 0; i--) {
