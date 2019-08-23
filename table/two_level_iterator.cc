@@ -11,6 +11,24 @@
 
 namespace leveldb {
 
+/**
+ * TwoLevelIterator结构:
+ *  __________________________________
+ * |      |      |      | .... |      |  level1
+ *  ----------------------------------
+ *   |        |       |             |
+ *   |        |       |             |
+ *   V        V       V             V
+ *  __       __       __            __
+ * |__| 1   |__| 7   |__| 13       |__| 19     level2
+ * |__| 2   |__| 8   |__| 14       |__| 20
+ * |__| 3   |__| 9   |__| 15       |__| 21
+ * |__| 4   |__| 10  |__| 16       |__| 22
+ * |__| 5   |__| 11  |__| 17       |__| 23
+ * |__| 6   |__| 12  |__| 18       |__| 24
+ *  图中数字代表顺序，例如：7的prev是6，next是8
+ **/
+
 namespace {
 
 typedef Iterator* (*BlockFunction)(void*, const ReadOptions&, const Slice&);
@@ -106,6 +124,7 @@ void TwoLevelIterator::Next() {
   SkipEmptyDataBlocksForward();
 }
 
+/** 向前移动，先第二层的data_iter_向前移动，如果移动过后其指向了null或者为无效，则对第一层向前 */
 void TwoLevelIterator::Prev() {
   assert(Valid());
   data_iter_.Prev();
@@ -113,6 +132,10 @@ void TwoLevelIterator::Prev() {
 }
 
 void TwoLevelIterator::SkipEmptyDataBlocksForward() {
+  /**
+   * 如果data_iter_为空或者data_iter_为无效, 则对index_iter_取next,
+   * 并令data_iter_指向第一个元素
+   **/
   while (data_iter_.iter() == nullptr || !data_iter_.Valid()) {
     // Move to next block
     if (!index_iter_.Valid()) {
@@ -126,6 +149,10 @@ void TwoLevelIterator::SkipEmptyDataBlocksForward() {
 }
 
 void TwoLevelIterator::SkipEmptyDataBlocksBackward() {
+  /**
+   * 如果data_iter_为空或者data_iter_为无效, 则对index_iter_取prev,
+   * 并令data_iter_指向最后一个元素
+   **/
   while (data_iter_.iter() == nullptr || !data_iter_.Valid()) {
     // Move to next block
     if (!index_iter_.Valid()) {
@@ -148,11 +175,18 @@ void TwoLevelIterator::InitDataBlock() {
     SetDataIterator(nullptr);
   } else {
     Slice handle = index_iter_.value();
+    /**
+     * index当前指向的value与data_block_handle_中缓存的相等,
+     * 则说明data_iter_就是由index_iter_构造的, 不用重新构造data_block_iterator_
+     **/
     if (data_iter_.iter() != nullptr &&
         handle.compare(data_block_handle_) == 0) {
       // data_iter_ is already constructed with this iterator, so
       // no need to change anything
     } else {
+      /**
+       * 重新构造data_iter_, 并令data_block_handle_缓存index_iter_指向的value
+       **/
       Iterator* iter = (*block_function_)(arg_, options_, handle);
       data_block_handle_.assign(handle.data(), handle.size());
       SetDataIterator(iter);
