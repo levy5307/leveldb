@@ -301,22 +301,27 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k, void* arg,
 
   /** 从index block中找到对应的meta block, meta block中存储了对应data block的用于快速查找的filter */
   Iterator* iiter = rep_->index_block->NewIterator(rep_->options.comparator);
-  iiter->Seek(k);
-
-  /** 如果找到了有效的block */
+  iiter->Seek(k);   // 根据key找到对应的pair(key: key, value: block handle of data clock)
   if (iiter->Valid()) {
+    /** block handle of data block */
     Slice handle_value = iiter->value();
+
+    /** 获取到meta block */
     FilterBlockReader* filter = rep_->filter;
     BlockHandle handle;
+
     /** 先从meta block中查找，如果没有，则一定没有；如果能找到，则不一定有，需要去block再查找验证 */
     if (filter != nullptr && handle.DecodeFrom(&handle_value).ok() &&
+        /** 根据data block offset可以获取到meta block index */
         !filter->KeyMayMatch(handle.offset(), k)) {
-        /** meta block中没有，一定没有 */
+        /** 若meta block中没有，一定没有 */
       // Not found
     } else {
-        /** meta block中没有，不一定有(bloom filter的特性决定的)，则需要从block中重新查找来最终确定是否存在 */
+      /** 若meta block中没有，则不一定有(bloom filter的特性决定的)，则需要从block中重新查找来最终确定是否存在 */
       Iterator* block_iter = BlockReader(this, options, iiter->value());
       block_iter->Seek(k);
+
+      /** 寻找到了，调用传入的回调函数 */
       if (block_iter->Valid()) {
         (*handle_result)(arg, block_iter->key(), block_iter->value());
       }

@@ -122,7 +122,7 @@ FilterBlockReader::FilterBlockReader(const FilterPolicy* policy,
 }
 
 bool FilterBlockReader::KeyMayMatch(uint64_t block_offset, const Slice& key) {
-  /** 先根据block_offset和base_lg_解析出filter block的index */
+  /** 先根据data block offset和base_lg_解析出filter block的index */
   uint64_t index = block_offset >> base_lg_;
   if (index < num_) {
     /** 解析得到filter block的开始offset和结束offset */
