@@ -16,6 +16,67 @@
 #include "util/coding.h"
 
 namespace leveldb {
+/**
+ * SSTable文件格式：
+ *        Data Block 1
+ *        Data Block 2        数据
+ *          ......      __________________________
+ *        Meta Block 1
+ *        Meta Block 2
+ *          ......
+ *     Meta Index Block
+ *       Index Block
+ *          Footer
+ *
+ *  Data Block/Meta Index Block/Index Block三者都是用block来存储的，所以是利用(key, value)的格式来存储一条条的record的;
+ *  而Meta Block则不同
+ *
+ *  1.Data Block中的KV记录是按照从小到大排序的
+ *    Data Block格式：
+ *      ________________________________________________________
+ *     |    Block Data    |       type      |       crc32       |
+ *      --------------------------------------------------------
+ *    Block data格式：
+ *      ____________________________________________________________________________
+ *      | c1 c2 | c3 c4 | c5 c6 | c1 restart | c3 restart | c5 restart | restart num |
+ *      ----------------------------------------------------------------------------
+ *    c(n) restart代表c(n)的偏移。需要使用偏移是因为c1/c2/c3等长度不一
+ *    restart num代表restart的数量或者crc信息。上图记录了restart数量
+ *    block_restart_interval指定了一个分区里有多少个entry，比如上图中就是2
+ *
+ *    c(n) entry格式：
+ *      _________________________________________________________________
+ *     | key共享长度 | key非共享长度 | value长度 | key非共享内容 | value内容 |
+ *      -----------------------------------------------------------------
+ *
+ *  2.Meta Block就是filter block, 存储了block的filter数据, 用于加快查询的速度
+ *    Meta Block格式:
+ *     |      filter data 1
+ *     |      filter data 2
+ *     |           ...
+ *     |      filter data n
+ *     |     filter offset 1
+ *     |     filter offset 2
+ *     |           ...
+ *     |     filter offset n
+ *     |  beginning of filter offset
+ *     V          base
+ *
+ *  3.Meta Index Block:
+ *      key: name of meta block i
+ *      value: block handle of meta block i
+ *
+ *  4.Index Block内的每条记录记录是对某个Data Block建立的索引信息，每条索引信息包括三个内容：
+ *      key: last key of data block i <= key < first key of data block i
+ *      value: block handle of data block i
+ *
+ *  5.Footer的格式：
+ *      offset    size        (metaindex_handle: meta index block handle)
+ *      offset    size        (index_handle: index block handle)
+ *          padding
+ *          magic             (8Bytes litten-endian)
+ *
+ **/
 
 struct Table::Rep {
   ~Rep() {
@@ -42,17 +103,20 @@ Status Table::Open(const Options& options, RandomAccessFile* file,
     return Status::Corruption("file is too short to be an sstable");
   }
 
+  /** 读取footer部分内容 */
   char footer_space[Footer::kEncodedLength];
   Slice footer_input;
   Status s = file->Read(size - Footer::kEncodedLength, Footer::kEncodedLength,
                         &footer_input, footer_space);
   if (!s.ok()) return s;
 
+  /** 读取footer部分内容到Footer里 */
   Footer footer;
   s = footer.DecodeFrom(&footer_input);
   if (!s.ok()) return s;
 
   // Read the index block
+  /** 读取index block的内容 */
   BlockContents index_block_contents;
   if (s.ok()) {
     ReadOptions opt;
@@ -65,6 +129,7 @@ Status Table::Open(const Options& options, RandomAccessFile* file,
   if (s.ok()) {
     // We've successfully read the footer and the index block: we're
     // ready to serve requests.
+    /** 创建index block */
     Block* index_block = new Block(index_block_contents);
     Rep* rep = new Table::Rep;
     rep->options = options;
@@ -74,6 +139,8 @@ Status Table::Open(const Options& options, RandomAccessFile* file,
     rep->cache_id = (options.block_cache ? options.block_cache->NewId() : 0);
     rep->filter_data = nullptr;
     rep->filter = nullptr;
+
+    /** 创建table并读取meta */
     *table = new Table(rep);
     (*table)->ReadMeta(footer);
   }
@@ -92,6 +159,8 @@ void Table::ReadMeta(const Footer& footer) {
   if (rep_->options.paranoid_checks) {
     opt.verify_checksums = true;
   }
+
+  /** 获取meta index block */
   BlockContents contents;
   if (!ReadBlock(rep_->file, opt, footer.metaindex_handle(), &contents).ok()) {
     // Do not propagate errors since meta info is not needed for operation
@@ -99,10 +168,13 @@ void Table::ReadMeta(const Footer& footer) {
   }
   Block* meta = new Block(contents);
 
+  /** 从meta index block中定位到key, 其value是meta block handle */
   Iterator* iter = meta->NewIterator(BytewiseComparator());
   std::string key = "filter.";
   key.append(rep_->options.filter_policy->Name());
   iter->Seek(key);
+
+  /** 读取该filter block(meta block) */
   if (iter->Valid() && iter->key() == Slice(key)) {
     ReadFilter(iter->value());
   }
@@ -111,6 +183,7 @@ void Table::ReadMeta(const Footer& footer) {
 }
 
 void Table::ReadFilter(const Slice& filter_handle_value) {
+  /** 解析获取filter handle(meta block handle) */
   Slice v = filter_handle_value;
   BlockHandle filter_handle;
   if (!filter_handle.DecodeFrom(&v).ok()) {
@@ -123,6 +196,8 @@ void Table::ReadFilter(const Slice& filter_handle_value) {
   if (rep_->options.paranoid_checks) {
     opt.verify_checksums = true;
   }
+
+  /** 通过filter handle读取到meta block */
   BlockContents block;
   if (!ReadBlock(rep_->file, opt, filter_handle, &block).ok()) {
     return;

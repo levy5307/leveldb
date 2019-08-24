@@ -34,8 +34,8 @@ void FilterBlockBuilder::AddKey(const Slice& key) {
 }
 
 /**
- * 把数据拼装成meta block并返回: 
- * result最终格式(也就是filter block的格式)：
+ * 把数据拼装成meta block并返回:
+ * result最终格式(也就是meta block的格式)：
  *  |      filter data 1
  *  |      filter data 2
  *  |           ...

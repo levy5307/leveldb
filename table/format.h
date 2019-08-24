@@ -27,15 +27,16 @@ struct ReadOptions;
  *      Meta Block 1
  *      Meta Block 2
  *          ...
- *    Meta Index Block
- *       Index Block
+ *      Index Block 1
+ *      Index Block 2
+ *          ...
  *         Footer
  *
  ****************************************************
  *
  * Footer的格式：
- *      offset    size        (metaindex_handle: data block index)
- *      offset    size        (index_handle: meta block index)
+ *      offset    size        (metaindex_handle)
+ *      offset    size        (index_handle)
  *          padding
  *          magic             (8Bytes litten-endian)
  **/
