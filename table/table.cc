@@ -311,8 +311,10 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k, void* arg,
     /** 先从meta block中查找，如果没有，则一定没有；如果能找到，则不一定有，需要去block再查找验证 */
     if (filter != nullptr && handle.DecodeFrom(&handle_value).ok() &&
         !filter->KeyMayMatch(handle.offset(), k)) {
+        /** meta block中没有，一定没有 */
       // Not found
     } else {
+        /** meta block中没有，不一定有(bloom filter的特性决定的)，则需要从block中重新查找来最终确定是否存在 */
       Iterator* block_iter = BlockReader(this, options, iiter->value());
       block_iter->Seek(k);
       if (block_iter->Valid()) {
