@@ -67,7 +67,7 @@ namespace leveldb {
  *      value: block handle of meta block i
  *
  *  4.Index Block内的每条记录记录是对某个Data Block建立的索引信息，每条索引信息包括三个内容：
- *      key: last key of data block i <= key < first key of data block i
+ *      key: last key of data block i <= key < first key of data block i + 1，也就是说对每个key都对value建立一个pair
  *      value: block handle of data block i
  *
  *  5.Footer的格式：
@@ -205,6 +205,8 @@ void Table::ReadFilter(const Slice& filter_handle_value) {
   if (block.heap_allocated) {
     rep_->filter_data = block.data.data();  // Will need to delete later
   }
+
+  /** 返回filter(meta) block reader */
   rep_->filter = new FilterBlockReader(rep_->options.filter_policy, block.data);
 }
 
@@ -227,6 +229,7 @@ static void ReleaseBlock(void* arg, void* h) {
 
 // Convert an index iterator value (i.e., an encoded BlockHandle)
 // into an iterator over the contents of the corresponding block.
+/** 根据index_value从table中找到对应的block，然后返回该block的iterator(该iterator就是block reader) */
 Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
                              const Slice& index_value) {
   Table* table = reinterpret_cast<Table*>(arg);
@@ -242,6 +245,7 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
 
   if (s.ok()) {
     BlockContents contents;
+    /** block_cache不为空的话，从block_cache中获取到对应的block，如果获取不到，则从文件中读 */
     if (block_cache != nullptr) {
       char cache_key_buffer[16];
       EncodeFixed64(cache_key_buffer, table->rep_->cache_id);
@@ -261,6 +265,7 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
         }
       }
     } else {
+      /** block_cache为空，则直接从文件中读 */
       s = ReadBlock(table->rep_->file, options, handle, &contents);
       if (s.ok()) {
         block = new Block(contents);
@@ -268,6 +273,7 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
     }
   }
 
+  /** 返回block的iterator */
   Iterator* iter;
   if (block != nullptr) {
     iter = block->NewIterator(table->rep_->options.comparator);
@@ -292,12 +298,17 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k, void* arg,
                           void (*handle_result)(void*, const Slice&,
                                                 const Slice&)) {
   Status s;
+
+  /** 从index block中找到对应的meta block, meta block中存储了对应data block的用于快速查找的filter */
   Iterator* iiter = rep_->index_block->NewIterator(rep_->options.comparator);
   iiter->Seek(k);
+
+  /** 如果找到了有效的block */
   if (iiter->Valid()) {
     Slice handle_value = iiter->value();
     FilterBlockReader* filter = rep_->filter;
     BlockHandle handle;
+    /** 先从meta block中查找，如果没有，则一定没有；如果能找到，则不一定有，需要去block再查找验证 */
     if (filter != nullptr && handle.DecodeFrom(&handle_value).ok() &&
         !filter->KeyMayMatch(handle.offset(), k)) {
       // Not found
