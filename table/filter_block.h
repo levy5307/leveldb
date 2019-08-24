@@ -28,7 +28,20 @@ class FilterPolicy;
 //
 // The sequence of calls to FilterBlockBuilder must match the regexp:
 //      (StartBlock AddKey*)* Finish
-/** filter block就是meta block, 一个sstable只有一个，存储了block的filter数据, 用于加快查询的速度 */
+/**
+ * filter block就是meta block, 一个sstable只有一个，存储了block的filter数据, 用于加快查询的速度
+ * filter block格式:
+ *    |      filter data 1
+ *    |      filter data 2
+ *    |           ...
+ *    |      filter data n
+ *    |     filter offset 1
+ *    |     filter offset 2
+ *    |           ...
+ *    |     filter offset n
+ *    |  beginning of filter offset
+ *    V          base
+ * */
 class FilterBlockBuilder {
  public:
   explicit FilterBlockBuilder(const FilterPolicy*);
@@ -44,8 +57,11 @@ class FilterBlockBuilder {
   void GenerateFilter();
 
   const FilterPolicy* policy_;
+  /** 缓存了所有key */
   std::string keys_;             // Flattened key contents
+  /** 缓存所有的key的偏移 */
   std::vector<size_t> start_;    // Starting index in keys_ of each key
+  /** 缓存了当前的计算结果，最后通过finish，将result_以及filter_offsets组合成filterBlock返回 */
   std::string result_;           // Filter data computed so far
   std::vector<Slice> tmp_keys_;  // policy_->CreateFilter() argument
   /** 各个filter在result_中的offset(Starting index in result_ of each filter) */

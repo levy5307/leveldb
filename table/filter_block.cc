@@ -34,16 +34,16 @@ void FilterBlockBuilder::AddKey(const Slice& key) {
 }
 
 /**
- * 把数据拼装起来并返回
- * result最终格式：
- *  |      filter block 1
- *  |      filter block 2
+ * 把数据拼装成meta block并返回: 
+ * result最终格式(也就是filter block的格式)：
+ *  |      filter data 1
+ *  |      filter data 2
  *  |           ...
- *  |      filter block n
- *  |      filter offset 1
- *  |      filter offset 2
+ *  |      filter data n
+ *  |     filter offset 1
+ *  |     filter offset 2
  *  |           ...
- *  |      filter offset n
+ *  |     filter offset n
  *  |  beginning of filter offset
  *  V          base
  **/
@@ -55,7 +55,7 @@ Slice FilterBlockBuilder::Finish() {
 
   // Append array of per-filter offsets
   /**
-   * 在执行Finishz之前，result_中就已经存储了各个生成的filter block
+   * 在执行Finish之前，result_中就已经存储了各个生成的filter data
    * append各个filter offset到result_中
    **/
   const uint32_t array_offset = result_.size();
@@ -71,6 +71,9 @@ Slice FilterBlockBuilder::Finish() {
   return Slice(result_);
 }
 
+/**
+ * 根据当前的所有keys_，生成一个filter data，追加到result_中，并更新filter_offsets_
+ **/
 void FilterBlockBuilder::GenerateFilter() {
   const size_t num_keys = start_.size();
   if (num_keys == 0) {
@@ -91,10 +94,10 @@ void FilterBlockBuilder::GenerateFilter() {
   }
 
   // Generate filter for current set of keys and append to result_.
-  /** 获取当前filter block的offset，存入filter_offsets_中 */
+  /** 获取当前filter data的offset，存入filter_offsets_中 */
   filter_offsets_.push_back(result_.size());
 
-  /** 根据num_keys个key创建一个filter block，追加到result_中 */
+  /** 根据num_keys个key创建一个filter data，追加到result_中 */
   policy_->CreateFilter(&tmp_keys_[0], static_cast<int>(num_keys), &result_);
 
   tmp_keys_.clear();
