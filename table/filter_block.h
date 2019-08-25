@@ -29,7 +29,7 @@ class FilterPolicy;
 // The sequence of calls to FilterBlockBuilder must match the regexp:
 //      (StartBlock AddKey*)* Finish
 /**
- * filter block就是meta block, 存储了block的filter数据, 用于加快查询的速度
+ * filter block就是meta block, 存储了block的filter数据, 用于加快查询的速度，一个sst文件中只有一个filter block
  * filter block格式:
  *    |      filter data 1
  *    |      filter data 2

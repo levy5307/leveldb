@@ -21,9 +21,7 @@ namespace leveldb {
  *        Data Block 1
  *        Data Block 2        数据
  *          ......      __________________________
- *        Meta Block 1
- *        Meta Block 2
- *          ......
+ *        Meta Block
  *     Meta Index Block
  *       Index Block
  *          Footer
