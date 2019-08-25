@@ -67,7 +67,7 @@ namespace leveldb {
  *      value: block handle of meta block i
  *
  *  4.Index Block内的每条记录记录是对某个Data Block建立的索引信息，每条索引信息包括三个内容：
- *      key: last key of data block i <= key < first key of data block i + 1，也就是说对每个key都对value建立一个pair
+ *      key: last key of data block i <= key < first key of data block i + 1
  *      value: block handle of data block i
  *
  *  5.Footer的格式：

@@ -95,27 +95,34 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
   Rep* r = rep_;
   assert(!r->closed);
   if (!ok()) return;
+  /** 之前插入过数据，则必须保证该次插入的key > last_key，保证其key增序 */
   if (r->num_entries > 0) {
     assert(r->options.comparator->Compare(key, Slice(r->last_key)) > 0);
   }
 
+  /** 新的data block */
   if (r->pending_index_entry) {
     assert(r->data_block.empty());
+    /** 找到一个令r->last_key, [r->last_key, key) */
     r->options.comparator->FindShortestSeparator(&r->last_key, key);
     std::string handle_encoding;
     r->pending_handle.EncodeTo(&handle_encoding);
+    /** 向index block中插入一个entry */
     r->index_block.Add(r->last_key, Slice(handle_encoding));
     r->pending_index_entry = false;
   }
 
+  /** 将key插入到filter block里，用于生成便于快速查找的filter */
   if (r->filter_block != nullptr) {
     r->filter_block->AddKey(key);
   }
 
   r->last_key.assign(key.data(), key.size());
+  /** 将key-value插入data block */
   r->num_entries++;
   r->data_block.Add(key, value);
 
+  /** 如果当前data block size >= 配置的block size，则刷新, 写入磁盘文件 */
   const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
   if (estimated_block_size >= r->options.block_size) {
     Flush();
@@ -128,11 +135,16 @@ void TableBuilder::Flush() {
   if (!ok()) return;
   if (r->data_block.empty()) return;
   assert(!r->pending_index_entry);
+
+  /** data block写入sst文件 */
   WriteBlock(&r->data_block, &r->pending_handle);
+
+  /** 写入成功，标记data block为空，并刷新文件 */
   if (ok()) {
     r->pending_index_entry = true;
     r->status = r->file->Flush();
   }
+
   if (r->filter_block != nullptr) {
     r->filter_block->StartBlock(r->offset);
   }
@@ -156,6 +168,7 @@ void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
       break;
 
     case kSnappyCompression: {
+      /** 压缩data block内容 */
       std::string* compressed = &r->compressed_output;
       if (port::Snappy_Compress(raw.data(), raw.size(), compressed) &&
           compressed->size() < raw.size() - (raw.size() / 8u)) {
@@ -169,6 +182,8 @@ void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
       break;
     }
   }
+
+  /** 将data block content写入到sst文件 */
   WriteRawBlock(block_contents, type, handle);
   r->compressed_output.clear();
   block->Reset();
@@ -179,13 +194,19 @@ void TableBuilder::WriteRawBlock(const Slice& block_contents,
   Rep* r = rep_;
   handle->set_offset(r->offset);
   handle->set_size(block_contents.size());
+
+  /** data block content追加到sst文件中 */
   r->status = r->file->Append(block_contents);
   if (r->status.ok()) {
     char trailer[kBlockTrailerSize];
     trailer[0] = type;
+
+    /** 根据data block content生成crc校验 */
     uint32_t crc = crc32c::Value(block_contents.data(), block_contents.size());
     crc = crc32c::Extend(crc, trailer, 1);  // Extend crc to cover block type
     EncodeFixed32(trailer + 1, crc32c::Mask(crc));
+
+    /** 将type(压缩类型)、crc校验码追加到sst文件中 */
     r->status = r->file->Append(Slice(trailer, kBlockTrailerSize));
     if (r->status.ok()) {
       r->offset += block_contents.size() + kBlockTrailerSize;
@@ -195,6 +216,7 @@ void TableBuilder::WriteRawBlock(const Slice& block_contents,
 
 Status TableBuilder::status() const { return rep_->status; }
 
+/** 将meta block、metaindex block、index block和footer写入文件 */
 Status TableBuilder::Finish() {
   Rep* r = rep_;
   Flush();
@@ -204,6 +226,7 @@ Status TableBuilder::Finish() {
   BlockHandle filter_block_handle, metaindex_block_handle, index_block_handle;
 
   // Write filter block
+  /** 写入filter block(meta block)*/
   if (ok() && r->filter_block != nullptr) {
     WriteRawBlock(r->filter_block->Finish(), kNoCompression,
                   &filter_block_handle);
