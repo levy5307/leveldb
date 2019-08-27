@@ -286,7 +286,7 @@ class InMemoryEnv : public EnvWrapper {
     return Status::OK();
   }
 
-  /** 个人认为这里的实现由问题, 最后创建的FileState并没有保存入file_map_ */
+  /** 个人认为这里的实现有问题, 最后创建的FileState并没有保存入file_map_ */
   Status NewAppendableFile(const std::string& fname,
                            WritableFile** result) override {
     MutexLock lock(&mutex_);
@@ -305,7 +305,7 @@ class InMemoryEnv : public EnvWrapper {
     return file_map_.find(fname) != file_map_.end();
   }
 
-  // 在所有的filename中查找前缀为"$dir/"的文件名字
+  /** 在所有的filename中查找前缀为"$dir/"的文件名字 */
   Status GetChildren(const std::string& dir,
                      std::vector<std::string>* result) override {
     MutexLock lock(&mutex_);
@@ -323,16 +323,20 @@ class InMemoryEnv : public EnvWrapper {
     return Status::OK();
   }
 
+  /** 删除文件(非线程安全，需要外部加锁) */
   void DeleteFileInternal(const std::string& fname)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+    /** 没有找到，直接返回 */
     if (file_map_.find(fname) == file_map_.end()) {
       return;
     }
 
+    /** 减少引用计数、从file_map中删除 */
     file_map_[fname]->Unref();
     file_map_.erase(fname);
   }
 
+  /** 删除文件 */
   Status DeleteFile(const std::string& fname) override {
     MutexLock lock(&mutex_);
     if (file_map_.find(fname) == file_map_.end()) {
