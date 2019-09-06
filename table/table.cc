@@ -251,8 +251,10 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
       Slice key(cache_key_buffer, sizeof(cache_key_buffer));
       cache_handle = block_cache->Lookup(key);
       if (cache_handle != nullptr) {
+        /** 从cache中找到了 */
         block = reinterpret_cast<Block*>(block_cache->Value(cache_handle));
       } else {
+        /** cache中没有找到，则读取文件，并将读取出来的block加入到block_cache中 */
         s = ReadBlock(table->rep_->file, options, handle, &contents);
         if (s.ok()) {
           block = new Block(contents);
