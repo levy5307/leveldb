@@ -172,10 +172,16 @@ inline bool ParseInternalKey(const Slice& internal_key,
                              ParsedInternalKey* result) {
   const size_t n = internal_key.size();
   if (n < 8) return false;
+  /** 读取最后8字节 --> num */
   uint64_t num = DecodeFixed64(internal_key.data() + n - 8);
+  /**
+   * 获取最后一字节 --> c和result->type
+   * 另外7字节 --> result->sequence
+   **/
   uint8_t c = num & 0xff;
   result->sequence = num >> 8;
   result->type = static_cast<ValueType>(c);
+  /** 前n-8字节 --> result->user_key */
   result->user_key = Slice(internal_key.data(), n - 8);
   return (c <= static_cast<uint8_t>(kTypeValue));
 }
