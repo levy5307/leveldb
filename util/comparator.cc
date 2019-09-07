@@ -33,7 +33,7 @@ class BytewiseComparatorImpl : public Comparator {
    * 找出[start, limit]区间内的一个最小的短串
    * 例如：start = [80, 86, 88, 99, 20]
    *      limit = [80, 86, 90]
-   * 找出的最小短串是[80, 85, 89]
+   * 找出的最小短串是[80, 86, 89]
    */
   void FindShortestSeparator(std::string* start,
                              const Slice& limit) const override {

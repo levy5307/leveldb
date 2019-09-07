@@ -19,6 +19,7 @@ static uint64_t PackSequenceAndType(uint64_t seq, ValueType t) {
   return (seq << 8) | t;
 }
 
+/** 将key追加到result所指向的内存 */
 void AppendInternalKey(std::string* result, const ParsedInternalKey& key) {
   result->append(key.user_key.data(), key.user_key.size());
   PutFixed64(result, PackSequenceAndType(key.sequence, key.type));
@@ -45,6 +46,12 @@ const char* InternalKeyComparator::Name() const {
   return "leveldb.InternalKeyComparator";
 }
 
+/**
+ * 对比两个key，排序规则：
+ *    1.首先，按照key升序
+ *    2.相同的key，按照sequence降序
+ *    3.相同的key和sequence，按照type降序
+ **/
 int InternalKeyComparator::Compare(const Slice& akey, const Slice& bkey) const {
   // Order by:
   //    increasing user key (according to user-supplied comparator)
@@ -63,6 +70,7 @@ int InternalKeyComparator::Compare(const Slice& akey, const Slice& bkey) const {
   return r;
 }
 
+/** If *start < limit, changes *start to a short string in [start,limit) */
 void InternalKeyComparator::FindShortestSeparator(std::string* start,
                                                   const Slice& limit) const {
   // Attempt to shorten the user portion of the key
@@ -82,6 +90,7 @@ void InternalKeyComparator::FindShortestSeparator(std::string* start,
   }
 }
 
+/** Changes *key to a short string >= *key */
 void InternalKeyComparator::FindShortSuccessor(std::string* key) const {
   Slice user_key = ExtractUserKey(*key);
   std::string tmp(user_key.data(), user_key.size());
@@ -99,6 +108,7 @@ void InternalKeyComparator::FindShortSuccessor(std::string* key) const {
 
 const char* InternalFilterPolicy::Name() const { return user_policy_->Name(); }
 
+/** 根据所有的key，生成一个bloom filter */
 void InternalFilterPolicy::CreateFilter(const Slice* keys, int n,
                                         std::string* dst) const {
   // We rely on the fact that the code in table.cc does not mind us
@@ -117,6 +127,7 @@ bool InternalFilterPolicy::KeyMayMatch(const Slice& key, const Slice& f) const {
 
 LookupKey::LookupKey(const Slice& user_key, SequenceNumber s) {
   size_t usize = user_key.size();
+  /** 保守估计预留空间 */
   size_t needed = usize + 13;  // A conservative estimate
   char* dst;
   if (needed <= sizeof(space_)) {
@@ -124,10 +135,13 @@ LookupKey::LookupKey(const Slice& user_key, SequenceNumber s) {
   } else {
     dst = new char[needed];
   }
+  /** 将usize存入dst */
   start_ = dst;
   dst = EncodeVarint32(dst, usize + 8);
+  /** 将key存入dst */
   kstart_ = dst;
   memcpy(dst, user_key.data(), usize);
+  /** 将sequence和type存入，并预留value的空间(通过dst += usize) */
   dst += usize;
   EncodeFixed64(dst, PackSequenceAndType(s, kValueTypeForSeek));
   dst += 8;
