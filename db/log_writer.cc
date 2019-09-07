@@ -31,6 +31,9 @@ Writer::Writer(WritableFile* dest, uint64_t dest_length)
 
 Writer::~Writer() = default;
 
+/**
+ * 添加一个Record
+ **/
 Status Writer::AddRecord(const Slice& slice) {
   const char* ptr = slice.data();
   size_t left = slice.size();
@@ -43,6 +46,7 @@ Status Writer::AddRecord(const Slice& slice) {
   do {
     const int leftover = kBlockSize - block_offset_;
     assert(leftover >= 0);
+    /** 如果剩余空间大小 < kHeaderSize, 剩余空间用0填充tailer, 开始下一个block */
     if (leftover < kHeaderSize) {
       // Switch to a new block
       if (leftover > 0) {
