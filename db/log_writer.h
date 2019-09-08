@@ -32,6 +32,7 @@ class WritableFile;
  *      tailer
  * tailer: 如果block最后剩余部分小于record的头部，则将其填充为0作为tailer。而record写入下一个block
  * record: 每次写入作为一个record, record组成：
+ *     (地址)低--->高：
  *      ________________________________________________________________
  *     | checksum(uint32) | length(uint16) | type(uint8) | data(length) |
  *      ----------------------------------------------------------------

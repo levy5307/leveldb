@@ -44,6 +44,10 @@ Status Writer::AddRecord(const Slice& slice) {
   Status s;
   bool begin = true;
   do {
+    /**
+     * 写入的地址是连续的，block_offset_只是起到一个标记的作用，标记处于当前block中的offset，
+     * 每次写入的时候则增加block_offset_，当开始一个新的block时将其置0
+     **/
     const int leftover = kBlockSize - block_offset_;
     assert(leftover >= 0);
     /** 如果剩余空间大小 < kHeaderSize, 剩余空间用0填充tailer, 开始下一个block */
@@ -60,9 +64,11 @@ Status Writer::AddRecord(const Slice& slice) {
     // Invariant: we never leave < kHeaderSize bytes in a block.
     assert(kBlockSize - block_offset_ - kHeaderSize >= 0);
 
+    /** 可用空间 & 所需写入空间 */
     const size_t avail = kBlockSize - block_offset_ - kHeaderSize;
     const size_t fragment_length = (left < avail) ? left : avail;
 
+    /** 确定type */
     RecordType type;
     const bool end = (left == fragment_length);
     if (begin && end) {
@@ -75,6 +81,7 @@ Status Writer::AddRecord(const Slice& slice) {
       type = kMiddleType;
     }
 
+    /** 写入record */
     s = EmitPhysicalRecord(type, ptr, fragment_length);
     ptr += fragment_length;
     left -= fragment_length;
@@ -88,6 +95,11 @@ Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr,
   assert(length <= 0xffff);  // Must fit in two bytes
   assert(block_offset_ + kHeaderSize + length <= kBlockSize);
 
+  /*
+   *   ________________________________________________________________
+   *  | checksum(uint32) | length(uint16) | type(uint8) | data(length) |
+   *   ----------------------------------------------------------------
+  **/
   // Format the header
   char buf[kHeaderSize];
   buf[4] = static_cast<char>(length & 0xff);
@@ -95,11 +107,13 @@ Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr,
   buf[6] = static_cast<char>(t);
 
   // Compute the crc of the record type and the payload.
+  /** 根据type和data获取crc */
   uint32_t crc = crc32c::Extend(type_crc_[t], ptr, length);
   crc = crc32c::Mask(crc);  // Adjust for storage
   EncodeFixed32(buf, crc);
 
   // Write the header and the payload
+  /** 写入header和data，并刷新 */
   Status s = dest_->Append(Slice(buf, kHeaderSize));
   if (s.ok()) {
     s = dest_->Append(Slice(ptr, length));
