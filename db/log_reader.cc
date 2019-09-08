@@ -100,8 +100,8 @@ bool Reader::ReadRecord(Slice* record, std::string* scratch) {
     /**
      * 根据record type，获取读取到的fragment内容:
      *  1.如果是kFullType, 将读取到的fragment复制到record中，并返回
-     *  2.如果是kFirstType, 则将读取到的fragment暂存到scratch中，以便于读取到剩余的内容时合并
-     *  3.如果是kMiddleType, 将读取的fragment追加到scratch中
+     *  2.如果是kFirstType, 则将读取到的fragment暂存到scratch中，继续循环，读取到剩余的内容合并然后返回
+     *  3.如果是kMiddleType, 将读取的fragment追加到scratch中, 继续循环，读取到剩余的内容合并然后返回
      *  4.如果是kLastType, 将读取的fragment追加到scratch，然后将scratch复制到recrod中
      *  其他情况代表读取失败
      **/
