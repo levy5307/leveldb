@@ -125,9 +125,17 @@ bool InternalFilterPolicy::KeyMayMatch(const Slice& key, const Slice& f) const {
   return user_policy_->KeyMayMatch(ExtractUserKey(key), f);
 }
 
+/**
+ *    _________________________________________________________________________________
+ *   | length of user key(4 bytes) | user key | sequence number(7 bytes) | type(1 byte)|
+ *    ---------------------------------------------------------------------------------
+ *   ^                             ^                                                   ^
+ *   |                             |                                                   |
+ *  start_                       kstart_                                              end
+**/
 LookupKey::LookupKey(const Slice& user_key, SequenceNumber s) {
   size_t usize = user_key.size();
-  /** 保守估计预留空间 */
+  /** 留空间 */
   size_t needed = usize + 13;  // A conservative estimate
   char* dst;
   if (needed <= sizeof(space_)) {
@@ -141,7 +149,7 @@ LookupKey::LookupKey(const Slice& user_key, SequenceNumber s) {
   /** 将key存入dst */
   kstart_ = dst;
   memcpy(dst, user_key.data(), usize);
-  /** 将sequence和type存入，并预留value的空间(通过dst += usize) */
+  /** 将sequence和type存入 */
   dst += usize;
   EncodeFixed64(dst, PackSequenceAndType(s, kValueTypeForSeek));
   dst += 8;

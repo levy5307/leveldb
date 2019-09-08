@@ -11,6 +11,10 @@
 
 namespace leveldb {
 
+/**
+ * data所指向的内存空间：[length of str, str]
+ * 该函数用于从data中获取str部分
+ **/
 static Slice GetLengthPrefixedSlice(const char* data) {
   uint32_t len;
   const char* p = data;
@@ -36,6 +40,7 @@ int MemTable::KeyComparator::operator()(const char* aptr,
 // Encode a suitable internal key target for "target" and return it.
 // Uses *scratch as scratch space, and the returned pointer will point
 // into this scratch space.
+/** 生成字符串，格式：[len of target data, data of target] */
 static const char* EncodeKey(std::string* scratch, const Slice& target) {
   scratch->clear();
   PutVarint32(scratch, target.size());
@@ -43,6 +48,14 @@ static const char* EncodeKey(std::string* scratch, const Slice& target) {
   return scratch->data();
 }
 
+/**
+ * Memory Table:
+ * (key 1, value 1) (key 2, value 2) ... (key n, value n)
+ *
+ * kv pair:
+ *   key: (length of key, data of key)
+ *   value: (length of value, data of value)
+ **/
 class MemTableIterator : public Iterator {
  public:
   explicit MemTableIterator(MemTable::Table* table) : iter_(table) {}
