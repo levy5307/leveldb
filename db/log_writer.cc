@@ -32,7 +32,7 @@ Writer::Writer(WritableFile* dest, uint64_t dest_length)
 Writer::~Writer() = default;
 
 /**
- * 添加一个Record
+ * 添加一个Record, 如果一个block空间不够，则将该record拆分成多个子record写入
  **/
 Status Writer::AddRecord(const Slice& slice) {
   const char* ptr = slice.data();

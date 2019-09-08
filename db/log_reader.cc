@@ -55,6 +55,10 @@ bool Reader::SkipToInitialBlock() {
   return true;
 }
 
+/**
+ * 读取record，如果该record被拆分成了多个子record，则一次性将所有的子record读完（使用scratch暂存）
+ * 然后合并到Slice *record中返回
+ **/
 bool Reader::ReadRecord(Slice* record, std::string* scratch) {
   /** 根据指定的initial_offset_跳过log文件开头的init_data */
   if (last_record_offset_ < initial_offset_) {
