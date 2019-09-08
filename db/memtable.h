@@ -86,8 +86,11 @@ class MemTable {
   ~MemTable();  // Private since only Unref() should be used to delete it
 
   KeyComparator comparator_;
+  /** 计数，当计数=0时释放空间 */
   int refs_;
+  /** 内存分配器 */
   Arena arena_;
+  /** 由skiplist实现 */
   Table table_;
 };
 
