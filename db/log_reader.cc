@@ -30,11 +30,13 @@ Reader::Reader(SequentialFile* file, Reporter* reporter, bool checksum,
 
 Reader::~Reader() { delete[] backing_store_; }
 
+/** 根据指定的initial_offset_跳过log文件开头的init_data */
 bool Reader::SkipToInitialBlock() {
   const size_t offset_in_block = initial_offset_ % kBlockSize;
   uint64_t block_start_location = initial_offset_ - offset_in_block;
 
   // Don't search a block if we'd be in the trailer
+  /** 如果该block剩余的size小于record的头长度（落在trailer空间内），则直接跳过这个block */
   if (offset_in_block > kBlockSize - 6) {
     block_start_location += kBlockSize;
   }
@@ -54,6 +56,7 @@ bool Reader::SkipToInitialBlock() {
 }
 
 bool Reader::ReadRecord(Slice* record, std::string* scratch) {
+  /** 根据指定的initial_offset_跳过log文件开头的init_data */
   if (last_record_offset_ < initial_offset_) {
     if (!SkipToInitialBlock()) {
       return false;
@@ -69,14 +72,20 @@ bool Reader::ReadRecord(Slice* record, std::string* scratch) {
 
   Slice fragment;
   while (true) {
+    /** 从log文件中读取一个record-->fragment */
     const unsigned int record_type = ReadPhysicalRecord(&fragment);
 
     // ReadPhysicalRecord may have only had an empty trailer remaining in its
     // internal buffer. Calculate the offset of the next physical record now
     // that it has returned, properly accounting for its header size.
+    /** record在block中的offset */
     uint64_t physical_record_offset =
         end_of_buffer_offset_ - buffer_.size() - kHeaderSize - fragment.size();
 
+    /**
+     * 如果一开始就读到kMiddleType，则该kMiddleType和kLastType的record显然是不正确(完整)的，所以简单的抛弃，继续读后面的。
+     * 由于leveldb中initial_offset_都是0，所以在leveldb中，resyncing一直都是false，所以这段代码几乎没有用
+     **/
     if (resyncing_) {
       if (record_type == kMiddleType) {
         continue;
@@ -88,6 +97,14 @@ bool Reader::ReadRecord(Slice* record, std::string* scratch) {
       }
     }
 
+    /**
+     * 根据record type，获取读取到的fragment内容:
+     *  1.如果是kFullType, 将读取到的fragment复制到record中，并返回
+     *  2.如果是kFirstType, 则将读取到的fragment暂存到scratch中，以便于读取到剩余的内容时合并
+     *  3.如果是kMiddleType, 将读取的fragment追加到scratch中
+     *  4.如果是kLastType, 将读取的fragment追加到scratch，然后将scratch复制到recrod中
+     *  其他情况代表读取失败
+     **/
     switch (record_type) {
       case kFullType:
         if (in_fragmented_record) {
@@ -188,11 +205,16 @@ void Reader::ReportDrop(uint64_t bytes, const Status& reason) {
 
 unsigned int Reader::ReadPhysicalRecord(Slice* result) {
   while (true) {
+    /** 当前block缓存中的空间小于kHeaderSize，则需要读取下一个block */
     if (buffer_.size() < kHeaderSize) {
+      /** 没有读到文件结尾，则继续读下一个block */
       if (!eof_) {
         // Last read was a full read, so this is a trailer to skip
+        /** trailer直接丢弃 */
         buffer_.clear();
+        /** 读取一个block的内容到buffer_中*/
         Status status = file_->Read(kBlockSize, &buffer_, backing_store_);
+        /** buffer中最后一个字节在文件中的offset */
         end_of_buffer_offset_ += buffer_.size();
         if (!status.ok()) {
           buffer_.clear();
@@ -200,6 +222,7 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result) {
           eof_ = true;
           return kEof;
         } else if (buffer_.size() < kBlockSize) {
+          /** 读取的buffer字节长度不足一个block，则说明读到了文件末尾 */
           eof_ = true;
         }
         continue;
@@ -208,6 +231,7 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result) {
         // end of the file, which can be caused by the writer crashing in the
         // middle of writing the header. Instead of considering this an error,
         // just report EOF.
+        /** 已经读完了文件结尾, 直接返回 */
         buffer_.clear();
         return kEof;
       }
@@ -219,6 +243,11 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result) {
     const uint32_t b = static_cast<uint32_t>(header[5]) & 0xff;
     const unsigned int type = header[6];
     const uint32_t length = a | (b << 8);
+    /**
+     * data length + header size > buffer_剩余的空间，说明此record有问题:
+     *  即使是一个record过长，在一个block放不下，而分成了多个record的话，此时的data length也应该是拆分后的record的实际长度,
+     *  因此不可能出现data length + header size > buffer_剩余空间的问题
+     * */
     if (kHeaderSize + length > buffer_.size()) {
       size_t drop_size = buffer_.size();
       buffer_.clear();
@@ -241,6 +270,9 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result) {
     }
 
     // Check crc
+    /**
+     * 检查header中的crc和用type/data生成的crc对比
+     **/
     if (checksum_) {
       uint32_t expected_crc = crc32c::Unmask(DecodeFixed32(header));
       uint32_t actual_crc = crc32c::Value(header + 6, 1 + length);
@@ -256,9 +288,11 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result) {
       }
     }
 
+    /** 将该record从buffer_中摘除 */
     buffer_.remove_prefix(kHeaderSize + length);
 
     // Skip physical record that started before initial_offset_
+    /** 如果该record是init data，直接将其清空 */
     if (end_of_buffer_offset_ - buffer_.size() - kHeaderSize - length <
         initial_offset_) {
       result->clear();
