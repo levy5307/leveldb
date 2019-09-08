@@ -17,6 +17,14 @@ namespace leveldb {
 class InternalKeyComparator;
 class MemTableIterator;
 
+/**
+ * Memory Table:
+ * (key 1, value 1) (key 2, value 2) ... (key n, value n)
+ *
+ * kv pair:
+ *   key: (length of key, data of key, tag-sequence num/type)
+ *   value: (length of value, data of value)
+ **/
 class MemTable {
  public:
   // MemTables are reference counted.  The initial reference count
@@ -69,6 +77,7 @@ class MemTable {
   struct KeyComparator {
     const InternalKeyComparator comparator;
     explicit KeyComparator(const InternalKeyComparator& c) : comparator(c) {}
+    /** 重载(), 用于对比字符串a和b */
     int operator()(const char* a, const char* b) const;
   };
 

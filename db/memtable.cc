@@ -53,7 +53,7 @@ static const char* EncodeKey(std::string* scratch, const Slice& target) {
  * (key 1, value 1) (key 2, value 2) ... (key n, value n)
  *
  * kv pair:
- *   key: (length of key, data of key)
+ *   key: (length of key, data of key, tag-sequence num/type)
  *   value: (length of value, data of value)
  **/
 class MemTableIterator : public Iterator {
@@ -96,23 +96,33 @@ void MemTable::Add(SequenceNumber s, ValueType type, const Slice& key,
   size_t key_size = key.size();
   size_t val_size = value.size();
   size_t internal_key_size = key_size + 8;
+  /** 计算并申请空间*/
   const size_t encoded_len = VarintLength(internal_key_size) +
                              internal_key_size + VarintLength(val_size) +
                              val_size;
   char* buf = arena_.Allocate(encoded_len);
+
+  /** 将length of internal key写入buf */
   char* p = EncodeVarint32(buf, internal_key_size);
+  /** data of key写入buf */
   memcpy(p, key.data(), key_size);
   p += key_size;
+  /** sequence和type写入buf */
   EncodeFixed64(p, (s << 8) | type);
   p += 8;
+  /** length of value写入buf */
   p = EncodeVarint32(p, val_size);
+  /** data of value写入buf */
   memcpy(p, value.data(), val_size);
   assert(p + val_size == buf + encoded_len);
+  /** 插入到table_(skiplist)中 */
   table_.Insert(buf);
 }
 
 bool MemTable::Get(const LookupKey& key, std::string* value, Status* s) {
+  /** 得到memkey */
   Slice memkey = key.memtable_key();
+  /** table_定位到memkey的位置 */
   Table::Iterator iter(&table_);
   iter.Seek(memkey.data());
   if (iter.Valid()) {
@@ -128,9 +138,15 @@ bool MemTable::Get(const LookupKey& key, std::string* value, Status* s) {
     const char* entry = iter.key();
     uint32_t key_length;
     const char* key_ptr = GetVarint32Ptr(entry, entry + 5, &key_length);
+    /** 对比iter所指向的key与待查找的key是否相同 */
     if (comparator_.comparator.user_comparator()->Compare(
             Slice(key_ptr, key_length - 8), key.user_key()) == 0) {
       // Correct user key
+      /**
+       * 解析tag字段：sequence num和type
+       * 如果是kTypeDeletion，则说明该k-v pair已经被删掉了;
+       * 否则，则解析获取value
+       **/
       const uint64_t tag = DecodeFixed64(key_ptr + key_length - 8);
       switch (static_cast<ValueType>(tag & 0xff)) {
         case kTypeValue: {
