@@ -76,7 +76,7 @@ struct LRUHandle {
 // table implementations in some of the compiler/runtime combinations
 // we have tested.  E.g., readrandom speeds up by ~5% over the g++
 // 4.4.3's builtin hashtable.
-/** 该hashtable主要用于lrucache加快索引速度 */
+/** 该hashtable主要用于加快cache中的entry的索引速度 */
 class HandleTable {
  public:
   HandleTable() : length_(0), elems_(0), list_(nullptr) { Resize(); }
@@ -95,7 +95,7 @@ class HandleTable {
      * 其原entry指针在这里会被删掉（覆盖掉其指针，而不是真正释放空间，因为hashtable中保存的都是entry的指针）
      **/
     *ptr = h;
-    /** 如果是新插入，则增加entry数量，如果数量>length, 则resize */
+    /** 如果是新插入，则增加entry数量，如果entry数量(elems_)>length, 则resize扩容 */
     if (old == nullptr) {
       ++elems_;
       if (elems_ > length_) {
@@ -109,6 +109,7 @@ class HandleTable {
     return old;
   }
 
+  /** 如果hashtable中的entry数量(elems_)>length, 则resize扩容 */
   LRUHandle* Remove(const Slice& key, uint32_t hash) {
     LRUHandle** ptr = FindPointer(key, hash);
     LRUHandle* result = *ptr;
@@ -219,7 +220,7 @@ class LRUCache {
   /** 双向循环链表，存放refs>=2 && in_cache==true的元素 */
   LRUHandle in_use_ GUARDED_BY(mutex_);
 
-  /** 该hashtable主要用于加快索引速度 */
+  /** 该hashtable主要用于加快索引速度, 加快查找cache中的entry的速度 */
   HandleTable table_ GUARDED_BY(mutex_);
 };
 
@@ -374,6 +375,7 @@ void LRUCache::Prune() {
 static const int kNumShardBits = 4;
 static const int kNumShards = 1 << kNumShardBits;
 
+/** 分成16个shard, 每个shard是一个lru cache */
 class ShardedLRUCache : public Cache {
  private:
   /** 一共有kNumShards个shard，通过hash函数来做load balance */
