@@ -206,7 +206,12 @@ class LRUCache {
   // Dummy head of LRU list.
   // lru.prev is newest entry, lru.next is oldest entry.
   // Entries have refs==1 and in_cache==true.
-  /** 双向循环链表，存放refs==1 && in_cache==true的元素 */
+  /**
+   * lru双向循环链表，存放refs==1 && in_cache==true的元素
+   * 当refs>1时，则将entry从lru中删除，然后放入in_use_中，
+   * lru中的entry根据最近最少使用原则淘汰数据。in_use_中entry则只有在当refs减少为1的时候才会被摘除，并放入到lru中
+   * 也就是说当refs>1时，不执行淘汰、其永久存在于cache中。只有对refs=1的entry执行最近最少使用原则进行淘汰
+   **/
   LRUHandle lru_ GUARDED_BY(mutex_);
 
   // Dummy head of in-use list.
@@ -244,7 +249,7 @@ void LRUCache::Ref(LRUHandle* e) {
   if (e->refs == 1 && e->in_cache) {  // If on lru_ list, move to in_use_ list.
     /** 从lru中移除 */
     LRU_Remove(e);
-    /** 假如in_use_ */
+    /** 加入in_use_ */
     LRU_Append(&in_use_, e);
   }
   e->refs++;
@@ -259,7 +264,7 @@ void LRUCache::Unref(LRUHandle* e) {
     free(e);
   } else if (e->in_cache && e->refs == 1) {
     // No longer in use; move to lru_ list.
-    /** 从in_use移除，假如lru */
+    /** 从in_use移除，加入lru */
     LRU_Remove(e);
     LRU_Append(&lru_, e);
   }
@@ -270,7 +275,7 @@ void LRUCache::LRU_Remove(LRUHandle* e) {
   e->prev->next = e->next;
 }
 
-/** 将e插入list前面 */
+/** 将e插入list前面(双向循环链表), 释放的时候从list后面开始释放 */
 void LRUCache::LRU_Append(LRUHandle* list, LRUHandle* e) {
   // Make "e" newest entry by inserting just before *list
   e->next = list;
