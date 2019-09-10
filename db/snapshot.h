@@ -36,6 +36,7 @@ class SnapshotImpl : public Snapshot {
 #endif  // !defined(NDEBUG)
 };
 
+/** 双向循环链表, 链表中的每个节点是SnapshotImpl(其只保存了sequence num) */
 class SnapshotList {
  public:
   SnapshotList() : head_(0) {
@@ -54,6 +55,7 @@ class SnapshotList {
   }
 
   // Creates a SnapshotImpl and appends it to the end of the list.
+  /** 在head之前插入 */
   SnapshotImpl* New(SequenceNumber sequence_number) {
     assert(empty() || newest()->sequence_number_ <= sequence_number);
 
