@@ -36,7 +36,7 @@ namespace leveldb {
  *      --------------------------------------------------------
  *    Block data格式：
  *      ____________________________________________________________________________
- *      | c1 c2 | c3 c4 | c5 c6 | c1 restart | c3 restart | c5 restart | restart num |
+ *     | c1 c2 | c3 c4 | c5 c6 | c1 restart | c3 restart | c5 restart | restart num |
  *      ----------------------------------------------------------------------------
  *    c(n) restart代表c(n)的偏移。需要使用偏移是因为c1/c2/c3等长度不一
  *    restart num代表restart的数量或者crc信息。上图记录了restart数量

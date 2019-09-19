@@ -95,7 +95,7 @@ Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr,
   assert(length <= 0xffff);  // Must fit in two bytes
   assert(block_offset_ + kHeaderSize + length <= kBlockSize);
 
-  /*
+  /**
    *   ________________________________________________________________
    *  | checksum(uint32) | length(uint16) | type(uint8) | data(length) |
    *   ----------------------------------------------------------------

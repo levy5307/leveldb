@@ -21,16 +21,13 @@ struct ReadOptions;
 
 /**
  * SSTable文件格式：
- *      Data Block 1
- *      Data Block 2
- *          ...
- *      Meta Block 1
- *      Meta Block 2
- *          ...
- *      Index Block 1
- *      Index Block 2
- *          ...
- *         Footer
+ *        Data Block 1
+ *        Data Block 2        数据
+ *          ......      __________________________
+ *        Meta Block
+ *     Meta Index Block
+ *       Index Block
+ *          Footer
  *
  ****************************************************
  *
