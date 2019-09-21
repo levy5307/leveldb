@@ -75,9 +75,12 @@ class VersionEdit {
     deleted_files_.insert(std::make_pair(level, file));
   }
 
+  /** 将VersionEdit成员保存到dst中 */
   void EncodeTo(std::string* dst) const;
+  /** 从src中解析VersionEdit成员 */
   Status DecodeFrom(const Slice& src);
 
+  /** 根据VersionEdit成员获取debug string */
   std::string DebugString() const;
 
  private:
