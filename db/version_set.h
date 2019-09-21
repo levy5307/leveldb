@@ -57,6 +57,12 @@ bool SomeFileOverlapsRange(const InternalKeyComparator& icmp,
                            const Slice* smallest_user_key,
                            const Slice* largest_user_key);
 
+/**
+ * 管理某个版本的所有sstable, db中可能有多个version存在，他们通过链表链接起来
+ * 为每个version加入引用计数，读以及解除读操作会将引用计数相应+1/-1，
+ * 当version的引用计数为0并且不是最新的version时，该version将会从链表中摘除，
+ * 同时，version内的sstable就可以删除了（这些废弃的sstable会在下一次campact完成时删除）
+ **/
 class Version {
  public:
   // Lookup the value for key.  If found, store it in *val and
@@ -70,8 +76,10 @@ class Version {
   // Append to *iters a sequence of iterators that will
   // yield the contents of this Version when merged together.
   // REQUIRES: This version has been saved (see VersionSet::SaveTo)
+  /** 获取收集当前版本所有文件的迭代器 */
   void AddIterators(const ReadOptions&, std::vector<Iterator*>* iters);
 
+  /** 在当前版本搜索键值 */
   Status Get(const ReadOptions&, const LookupKey& key, std::string* val,
              GetStats* stats);
 
@@ -101,11 +109,13 @@ class Version {
   // some part of [*smallest_user_key,*largest_user_key].
   // smallest_user_key==nullptr represents a key smaller than all the DB's keys.
   // largest_user_key==nullptr represents a key largest than all the DB's keys.
+  /** 判断键值范围与文件是否有交集 */
   bool OverlapInLevel(int level, const Slice* smallest_user_key,
                       const Slice* largest_user_key);
 
   // Return the level at which we should place a new memtable compaction
   // result that covers the range [smallest_user_key,largest_user_key].
+  /** 返回对memtable campaction result的存放level */
   int PickLevelForMemTableOutput(const Slice& smallest_user_key,
                                  const Slice& largest_user_key);
 
