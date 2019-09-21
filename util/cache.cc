@@ -212,6 +212,7 @@ class LRUCache {
    * 当refs>1时，则将entry从lru中删除，然后放入in_use_中，
    * lru中的entry根据最近最少使用原则淘汰数据。in_use_中entry则只有在当refs减少为1的时候才会被摘除，并放入到lru中
    * 也就是说当refs>1时，不执行淘汰、其永久存在于cache中。只有对refs=1的entry执行最近最少使用原则进行淘汰
+   * 另外对于新插入的节点，令其refs=2并插入到in_use_中
    **/
   LRUHandle lru_ GUARDED_BY(mutex_);
 
@@ -325,9 +326,10 @@ Cache::Handle* LRUCache::Insert(const Slice& key, uint32_t hash, void* value,
     FinishErase(table_.Insert(e));
   } else {  // don't cache. (capacity_==0 is supported and turns off caching.)
     // next is read by key() in an assert, so it must be initialized
-    /** 如果capacity_==0，则创建的e不加入cache中*/
+    /** 如果capacity_==0，则创建的e不加入cache中 */
     e->next = nullptr;
   }
+
   /** 如果插入该新创建的entry后usege_超出了其capacity_, 则根据lru释放掉一个 */
   while (usage_ > capacity_ && lru_.next != &lru_) {
     LRUHandle* old = lru_.next;

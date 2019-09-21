@@ -20,6 +20,11 @@ namespace leveldb {
 
 class Env;
 
+/**
+ * TableCache用于缓存SSTable的对应索引元数据
+ *   k-file num
+ *   v-TableAndFile对应的预加载索引
+ * */
 class TableCache {
  public:
   TableCache(const std::string& dbname, const Options& options, int entries);
