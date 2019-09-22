@@ -85,6 +85,7 @@ Version::~Version() {
   }
 }
 
+/** 二分查找：files是有序的，file[0]中的key < files[1]中的key */
 int FindFile(const InternalKeyComparator& icmp,
              const std::vector<FileMetaData*>& files, const Slice& key) {
   uint32_t left = 0;
@@ -105,6 +106,7 @@ int FindFile(const InternalKeyComparator& icmp,
   return right;
 }
 
+/** 判断key是否 > 文件f中的所有key，也就是排序在文件f的后面 */
 static bool AfterFile(const Comparator* ucmp, const Slice* user_key,
                       const FileMetaData* f) {
   // null user_key occurs before all keys and is therefore never after *f
@@ -112,6 +114,7 @@ static bool AfterFile(const Comparator* ucmp, const Slice* user_key,
           ucmp->Compare(*user_key, f->largest.user_key()) > 0);
 }
 
+/** 判断key是否 < 文件f中的所有key，也就是排序在文件f的前面 */
 static bool BeforeFile(const Comparator* ucmp, const Slice* user_key,
                        const FileMetaData* f) {
   // null user_key occurs after all keys and is therefore never before *f
@@ -119,6 +122,10 @@ static bool BeforeFile(const Comparator* ucmp, const Slice* user_key,
           ucmp->Compare(*user_key, f->smallest.user_key()) < 0);
 }
 
+/** 
+ * 顺序查找，判断smallest_user_key <= f中所有key 或者 largest_user_key >= f中的所有key，
+ * 如果是则说明找到了，返回true，如果所有的files都不满足条件，则返回false
+ **/
 bool SomeFileOverlapsRange(const InternalKeyComparator& icmp,
                            bool disjoint_sorted_files,
                            const std::vector<FileMetaData*>& files,

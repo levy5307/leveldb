@@ -42,6 +42,7 @@ class WritableFile;
 // Return the smallest index i such that files[i]->largest >= key.
 // Return files.size() if there is no such file.
 // REQUIRES: "files" contains a sorted list of non-overlapping files.
+/** 查找满足files[i]->largest >= key的最小下标i的file, 如果没有找到，则返回files.size() */
 int FindFile(const InternalKeyComparator& icmp,
              const std::vector<FileMetaData*>& files, const Slice& key);
 
@@ -51,6 +52,11 @@ int FindFile(const InternalKeyComparator& icmp,
 // largest==nullptr represents a key largest than all keys in the DB.
 // REQUIRES: If disjoint_sorted_files, files[] contains disjoint ranges
 //           in sorted order.
+/**
+ * 如果files中的某个文件中的key集合包含在的[*smallest, *largest]中，则返回true
+ * 如果smallest==nullptr, 则代表DB中的最小key
+ * 如果largest==nullptr, 则代表DB中的最大key
+ **/
 bool SomeFileOverlapsRange(const InternalKeyComparator& icmp,
                            bool disjoint_sorted_files,
                            const std::vector<FileMetaData*>& files,
