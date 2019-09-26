@@ -280,8 +280,10 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
   if (block != nullptr) {
     iter = block->NewIterator(table->rep_->options.comparator);
     if (cache_handle == nullptr) {
+      /** 如果没有从缓存中读取，而是直接从文件中读取的，则注册一个cleanup函数，用于释放block空间 */
       iter->RegisterCleanup(&DeleteBlock, block, nullptr);
     } else {
+        /** 从缓存中读取，则注册一个cleanup函数，用于从block_cache中release该cache_handle */
       iter->RegisterCleanup(&ReleaseBlock, block_cache, cache_handle);
     }
   } else {
