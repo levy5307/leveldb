@@ -275,7 +275,7 @@ class Block::Iter : public Iterator {
       key_.append(p, non_shared);
       /** 获取value */
       value_ = Slice(p + non_shared, value_length);
-      /** 设置restart_inext */
+      /** 设置restart_index */
       while (restart_index_ + 1 < num_restarts_ &&
              GetRestartPoint(restart_index_ + 1) < current_) {
         ++restart_index_;

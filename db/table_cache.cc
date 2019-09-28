@@ -48,6 +48,7 @@ Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
   EncodeFixed64(buf, file_number);
   Slice key(buf, sizeof(buf));
 
+  /** 先在cache中找，如果没有找到，再取加载文件, 并保存到cache中 */
   *handle = cache_->Lookup(key);
   if (*handle == nullptr) {
     /** fname=dbname_/file_number.ldb */

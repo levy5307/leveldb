@@ -219,18 +219,28 @@ class Version::LevelFileNumIterator : public Iterator {
   mutable char value_buf_[16];
 };
 
+/** 获取file iterator(two level iterator) */
 static Iterator* GetFileIterator(void* arg, const ReadOptions& options,
                                  const Slice& file_value) {
+  /** 这个cache是在Version::NewConcatenatingIterator传入的vset_->table_cache_ */
   TableCache* cache = reinterpret_cast<TableCache*>(arg);
   if (file_value.size() != 16) {
     return NewErrorIterator(
         Status::Corruption("FileReader invoked with unexpected value"));
   } else {
+    /** 根据file number, file size获取file iterator */
     return cache->NewIterator(options, DecodeFixed64(file_value.data()),
                               DecodeFixed64(file_value.data() + 8));
   }
 }
 
+/**
+ * 获取双层的two level iterator:
+ *  index: LevelFileNumIterator 保存某一个level层所有的file meta
+ *  data: two level iterator
+ *      index: index block iterator
+ *      data: block iterator
+ **/
 Iterator* Version::NewConcatenatingIterator(const ReadOptions& options,
                                             int level) const {
   return NewTwoLevelIterator(

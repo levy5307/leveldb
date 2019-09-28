@@ -105,6 +105,7 @@ class Version {
   void Ref();
   void Unref();
 
+  /** 获取所有与[begin, end]有overlap的文件集合-->inputs */
   void GetOverlappingInputs(
       int level,
       const InternalKey* begin,  // nullptr means before all keys
@@ -158,6 +159,7 @@ class Version {
   // false, makes no more calls.
   //
   // REQUIRES: user portion of internal_key == user_key.
+  /** 对所有与user_key有overlap的文件执行func函数 */
   void ForEachOverlapping(Slice user_key, Slice internal_key, void* arg,
                           bool (*func)(void*, int, FileMetaData*));
 
