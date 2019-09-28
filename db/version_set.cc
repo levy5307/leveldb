@@ -235,11 +235,33 @@ static Iterator* GetFileIterator(void* arg, const ReadOptions& options,
 }
 
 /**
- * 获取双层的two level iterator:
+ * 获取嵌套双层的two level iterator:
  *  index: LevelFileNumIterator 保存某一个level层所有的file meta
  *  data: two level iterator
  *      index: index block iterator
  *      data: block iterator
+ *
+ * 结构:
+ *  ____________________________________________________________________
+ * |    file meta 0     |    file meta 1    |  .... |    file meta n    | <--  level 1 iterator: LevelFileNumIterator
+ *  --------------------------------------------------------------------
+ *     |
+ *     |
+ *     V
+ *  ____________________________
+ * |        |         |         |  <--  level 2.1 iterator: index block iterator
+ *  ----------------------------
+ *     |         |          |
+ *     |         |          |
+ *     V         V          V
+ *    __        __         __
+ *   |__|      |__|       |__|    ^
+ *   |__|      |__|       |__|    |
+ *   |__|      |__|       |__|    | <--  level 2.2 iterator: data block iterator
+ *   |__|      |__|       |__|    |
+ *   |__|      |__|       |__|    |
+ *   |__|      |__|       |__|    v
+ *
  **/
 Iterator* Version::NewConcatenatingIterator(const ReadOptions& options,
                                             int level) const {
