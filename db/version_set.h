@@ -121,7 +121,7 @@ class Version {
 
   // Return the level at which we should place a new memtable compaction
   // result that covers the range [smallest_user_key,largest_user_key].
-  /** 返回对memtable campaction result的存放level */
+  /** 返回memtable campaction result的存放level */
   int PickLevelForMemTableOutput(const Slice& smallest_user_key,
                                  const Slice& largest_user_key);
 

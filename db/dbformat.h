@@ -39,6 +39,11 @@ static const int kL0_StopWritesTrigger = 12;
 // expensive manifest file operations.  We do not push all the way to
 // the largest level since that can generate a lot of wasted disk
 // space if the same key space is being repeatedly overwritten.
+/**
+ * compact memtable生成的（不产生重叠的）文件的最大存放层，这里设置成2。
+ * 推送到level 2可以避免0-->1层的文件操作的花费
+ * 不一定所有的都推向最大层，因为都推向最大层会导致磁盘空间浪费
+ **/
 static const int kMaxMemCompactLevel = 2;
 
 // Approximate gap in bytes between samples of data read during iteration.
