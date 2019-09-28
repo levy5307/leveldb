@@ -38,7 +38,12 @@ TableCache::TableCache(const std::string& dbname, const Options& options,
 
 TableCache::~TableCache() { delete cache_; }
 
-/** handle作为参数返回值，保存table/file */
+/**
+ * Table就是sstable
+ * 从cache_中查找是否缓存了该Table(即该Table打开过了), 否则调用Table::Open()打开文件，读取除data block之外的其他block
+ * 并将其缓存到cache_中: key-file number, value-handle of table and file
+ * handle作为参数返回值，保存table/file指针
+ **/
 Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
                              Cache::Handle** handle) {
   Status s;
@@ -65,7 +70,7 @@ Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
       }
     }
     if (s.ok()) {
-      /** 打开文件, 获取table */
+      /** 打开文件, 读取table内容-->table中 */
       s = Table::Open(options_, file, file_size, &table);
     }
 

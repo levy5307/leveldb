@@ -96,6 +96,11 @@ struct Table::Rep {
   Block* index_block;
 };
 
+/**
+ * 读取table，读取除了data block之外的其他的block
+ * 同时为data block维护了一个缓存block_cache，在读取data block中的key时，先去block_cache中查看该block是否存在
+ * 如果存在直接在缓存中查找，如果不存在，则加载该data block，并存入block_cache中
+ * */
 Status Table::Open(const Options& options, RandomAccessFile* file,
                    uint64_t size, Table** table) {
   *table = nullptr;
@@ -304,9 +309,10 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k, void* arg,
                                                 const Slice&)) {
   Status s;
 
-  /** 从index block中找到对应的meta block, meta block中存储了对应data block的用于快速查找的filter */
+  /** 从index block中找到对应的data block */
   Iterator* iiter = rep_->index_block->NewIterator(rep_->options.comparator);
   iiter->Seek(k);   // 根据key找到对应的pair(key: key, value: block handle of data clock)
+  /** 该data block必须有效 */
   if (iiter->Valid()) {
     /** block handle of data block */
     Slice handle_value = iiter->value();
@@ -317,12 +323,16 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k, void* arg,
 
     /** 先从meta block中查找，如果没有，则一定没有；如果能找到，则不一定有，需要去block再查找验证 */
     if (filter != nullptr && handle.DecodeFrom(&handle_value).ok() &&
-        /** 根据data block offset可以获取到meta block index */
+        /** 根据data block offset可以获取到meta block entry index, 从而判断该key是否存在 */
         !filter->KeyMayMatch(handle.offset(), k)) {
         /** 若meta block中没有，一定没有 */
       // Not found
     } else {
-      /** 若meta block中没有，则不一定有(bloom filter的特性决定的)，则需要从block中重新查找来最终确定是否存在 */
+      /**
+       * 若meta block中没有，则不一定有(bloom filter的特性决定的)，则需要从block中重新查找来最终确定是否存在
+       * 在BlockReader函数中，先从block_cache中查找是否有该data block，如果没有，则读取block、并加入到block_cache中
+       * 最终返回该data block的iterator
+       **/
       Iterator* block_iter = BlockReader(this, options, iiter->value());
       block_iter->Seek(k);
 

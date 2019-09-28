@@ -235,7 +235,7 @@ static Iterator* GetFileIterator(void* arg, const ReadOptions& options,
 }
 
 /**
- * 获取嵌套双层的two level iterator:
+ * 获取特定某一层level所有sstable file的、嵌套双层的two level iterator:
  *  index: LevelFileNumIterator 保存某一个level层所有的file meta
  *  data: two level iterator
  *      index: index block iterator
@@ -273,6 +273,7 @@ Iterator* Version::NewConcatenatingIterator(const ReadOptions& options,
 void Version::AddIterators(const ReadOptions& options,
                            std::vector<Iterator*>* iters) {
   // Merge all level zero files together since they may overlap
+  /** 由于level 0层的文件之间有重叠，所以分别为每个文件创建一个iterator */
   for (size_t i = 0; i < files_[0].size(); i++) {
     iters->push_back(vset_->table_cache_->NewIterator(
         options, files_[0][i]->number, files_[0][i]->file_size));
@@ -281,6 +282,7 @@ void Version::AddIterators(const ReadOptions& options,
   // For levels > 0, we can use a concatenating iterator that sequentially
   // walks through the non-overlapping files in the level, opening them
   // lazily.
+  /** 由于level > 0的level创建一个two level iterator */
   for (int level = 1; level < config::kNumLevels; level++) {
     if (!files_[level].empty()) {
       iters->push_back(NewConcatenatingIterator(options, level));
@@ -386,6 +388,7 @@ Status Version::Get(const ReadOptions& options, const LookupKey& k,
   // in a smaller level, later levels are irrelevant.
   std::vector<FileMetaData*> tmp;
   FileMetaData* tmp2;
+  /** 从第0层开始查找 */
   for (int level = 0; level < config::kNumLevels; level++) {
     size_t num_files = files_[level].size();
     if (num_files == 0) continue;
@@ -393,9 +396,12 @@ Status Version::Get(const ReadOptions& options, const LookupKey& k,
     // Get the list of files to search in this level
     FileMetaData* const* files = &files_[level][0];
     if (level == 0) {
+        /** 如果level=0, 由于文件之间有overlap，所以需要查找该层中的所有文件 */
       // Level-0 files may overlap each other.  Find all files that
       // overlap user_key and process them in order from newest to oldest.
       tmp.reserve(num_files);
+
+      /** 将包含user_key的所有文件保存到tmp中, 并根据sort算法，查找到最新的文件 */
       for (uint32_t i = 0; i < num_files; i++) {
         FileMetaData* f = files[i];
         if (ucmp->Compare(user_key, f->smallest.user_key()) >= 0 &&
@@ -403,20 +409,29 @@ Status Version::Get(const ReadOptions& options, const LookupKey& k,
           tmp.push_back(f);
         }
       }
+
+      /** 没找到，则去下一层找 */
       if (tmp.empty()) continue;
 
+      /** 排序, FileMetaData::number越大的文件越新, 也就排在前面 */
       std::sort(tmp.begin(), tmp.end(), NewestFirst);
       files = &tmp[0];
       num_files = tmp.size();
     } else {
+      /**
+       * level>0, 由于文件内以及文件之间的key是有序的，所以可以采用二分查找
+       * 找到largest key>=user_key的index最小的文件(第一个文件)
+       **/
       // Binary search to find earliest index whose largest key >= ikey.
       uint32_t index = FindFile(vset_->icmp_, files_[level], ikey);
+      /** index大于该层的文件数量，则说明没有找到 */
       if (index >= num_files) {
         files = nullptr;
         num_files = 0;
       } else {
         tmp2 = files[index];
         if (ucmp->Compare(user_key, tmp2->smallest.user_key()) < 0) {
+            /** 如果user_key<该文件的smallest key，则说明user_key不在该文件中，也就是不在该level中 */
           // All of "tmp2" is past any data for user_key
           files = nullptr;
           num_files = 0;
@@ -450,10 +465,13 @@ Status Version::Get(const ReadOptions& options, const LookupKey& k,
       }
       switch (saver.state) {
         case kNotFound:
+          /** 没找到，则去下一层继续找 */
           break;  // Keep searching in other files
         case kFound:
+          /** 找到了, 直接返回 */
           return s;
         case kDeleted:
+          /** 该key已经被删除 */
           s = Status::NotFound(Slice());  // Use empty error message for speed
           return s;
         case kCorrupt:
@@ -463,6 +481,7 @@ Status Version::Get(const ReadOptions& options, const LookupKey& k,
     }
   }
 
+  /** 如果所有层都没有找到，则返回NotFound */
   return Status::NotFound(Slice());  // Use an empty error message for speed
 }
 
