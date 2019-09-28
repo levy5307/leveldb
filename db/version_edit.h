@@ -19,11 +19,15 @@ struct FileMetaData {
   FileMetaData() : refs(0), allowed_seeks(1 << 30), file_size(0) {}
 
   int refs;
+  /** compact之前需要seek的次数 */
   int allowed_seeks;  // Seeks allowed until compaction
   /** number越大的文件越新 */
   uint64_t number;
+  /** 文件的大小 */
   uint64_t file_size;    // File size in bytes
+  /** 文件中的最小key */
   InternalKey smallest;  // Smallest internal key served by table
+  /** 文件中的最大key */
   InternalKey largest;   // Largest internal key served by table
 };
 

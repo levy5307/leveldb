@@ -173,7 +173,9 @@ class Version {
   std::vector<FileMetaData*> files_[config::kNumLevels];
 
   // Next file to compact based on seek stats.
+  /** 需要compact的文件(allowed_seeks减少到了0) */
   FileMetaData* file_to_compact_;
+  /** file_to_compact_文件的level */
   int file_to_compact_level_;
 
   // Level that should be compacted next and its compaction score.
