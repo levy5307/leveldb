@@ -102,6 +102,7 @@ class Version {
 
   // Reference count management (so Versions do not disappear out from
   // under live iterators)
+  /** 引用 & 解引用 */
   void Ref();
   void Unref();
 
@@ -160,7 +161,7 @@ class Version {
   // false, makes no more calls.
   //
   // REQUIRES: user portion of internal_key == user_key.
-  /** 对所有与user_key有overlap的文件执行func函数 */
+  /** 对所有与user_key有overlap的文件执行func函数, 如果func执行返回了false，则停止轮询 */
   void ForEachOverlapping(Slice user_key, Slice internal_key, void* arg,
                           bool (*func)(void*, int, FileMetaData*));
 

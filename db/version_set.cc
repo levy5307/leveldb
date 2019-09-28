@@ -351,7 +351,7 @@ void Version::ForEachOverlapping(Slice user_key, Slice internal_key, void* arg,
   }
 
   // Search other levels.
-  /** 对level > 0的层，由于是有序的，则先找到largest key > iternal_key > smallest key的文件，执行func */
+  /** 对level > 0的层，由于是有序的，则根据二分查找找到largest key > iternal_key > smallest key的文件，执行func */
   for (int level = 1; level < config::kNumLevels; level++) {
     size_t num_files = files_[level].size();
     if (num_files == 0) continue;
@@ -488,6 +488,10 @@ Status Version::Get(const ReadOptions& options, const LookupKey& k,
 bool Version::UpdateStats(const GetStats& stats) {
   FileMetaData* f = stats.seek_file;
   if (f != nullptr) {
+    /**
+     * allowed_seeks减1，如果减1之后其值<=0，并且当前没有file要进行compact,
+     * 那么则记录要进行compact的文件-->file_to_compact_，并记录该文件的level-->file_to_compact_level_
+     **/
     f->allowed_seeks--;
     if (f->allowed_seeks <= 0 && file_to_compact_ == nullptr) {
       file_to_compact_ = f;
@@ -510,12 +514,16 @@ bool Version::RecordReadSample(Slice internal_key) {
 
     static bool Match(void* arg, int level, FileMetaData* f) {
       State* state = reinterpret_cast<State*>(arg);
+      /** 说明找到了一个匹配文件，matches+1 */
       state->matches++;
       if (state->matches == 1) {
         // Remember first match.
+        /** 记录第一个匹配的文件及level */
         state->stats.seek_file = f;
         state->stats.seek_file_level = level;
       }
+
+      /** 当找到两个matches，则返回false, 即停止遍历 */
       // We can stop iterating once we have a second match.
       return state->matches < 2;
     }
@@ -529,6 +537,11 @@ bool Version::RecordReadSample(Slice internal_key) {
   // files. But what if we have a single file that contains many
   // overwrites and deletions?  Should we have another mechanism for
   // finding such files?
+  /**
+   * 有两个及以上个sstable文件中命中了该internal_key, 说明对于该internal_key来说，当前的level分层情况不是特别理想，
+   * 则调用UpdateStats去更新第一个命中文件的allowed_seeks, 令其减1, 当allowed_seeks减少到0时，则记录该文件将会执行compact并记录其level，
+   * 后续会执行compact
+   **/
   if (state.matches >= 2) {
     // 1MB cost is about 1 seek (see comment in Builder::Apply).
     return UpdateStats(state.stats);
