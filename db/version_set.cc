@@ -681,9 +681,11 @@ std::string Version::DebugString() const {
 class VersionSet::Builder {
  private:
   // Helper to sort by v->files_[file_number].smallest
+  /** std::set操作的自定义compare */
   struct BySmallestKey {
     const InternalKeyComparator* internal_comparator;
 
+    /** 比较两个文件最小key的大小，如果最小key相等，则比较key的数量 */
     bool operator()(FileMetaData* f1, FileMetaData* f2) const {
       int r = internal_comparator->Compare(f1->smallest, f2->smallest);
       if (r != 0) {
@@ -869,6 +871,7 @@ VersionSet::~VersionSet() {
   delete descriptor_file_;
 }
 
+/** 将一个version加入version链表(双向循环链表)中, 链表中有一个头结点dummy_versions_ */
 void VersionSet::AppendVersion(Version* v) {
   // Make "v" current
   assert(v->refs_ == 0);
