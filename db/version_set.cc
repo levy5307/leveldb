@@ -123,8 +123,8 @@ static bool BeforeFile(const Comparator* ucmp, const Slice* user_key,
 }
 
 /**
- * 顺序查找，判断smallest_user_key <= f中所有key 或者 largest_user_key >= f中的所有key，
- * 如果是则说明找到了，返回true，如果所有的files都不满足条件，则返回false
+ * 顺序查找与[smallest_user_key, largest_user_key]有overlap的文件
+ * 如果找到了，返回true，如果所有的files都不满足条件，则返回false
  **/
 bool SomeFileOverlapsRange(const InternalKeyComparator& icmp,
                            bool disjoint_sorted_files,
