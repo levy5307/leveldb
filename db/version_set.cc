@@ -699,6 +699,7 @@ class VersionSet::Builder {
 
   typedef std::set<FileMetaData*, BySmallestKey> FileSet;
   struct LevelState {
+    /** deleted file num set */
     std::set<uint64_t> deleted_files;
     FileSet* added_files;
   };
@@ -713,12 +714,14 @@ class VersionSet::Builder {
     base_->Ref();
     BySmallestKey cmp;
     cmp.internal_comparator = &vset_->icmp_;
+    /** 为每个层分别创建一个file set */
     for (int level = 0; level < config::kNumLevels; level++) {
       levels_[level].added_files = new FileSet(cmp);
     }
   }
 
   ~Builder() {
+    /** 对每一层，分别对每一个文件，对ref-1，如果减后ref=0, 则释放file */
     for (int level = 0; level < config::kNumLevels; level++) {
       const FileSet* added = levels_[level].added_files;
       std::vector<FileMetaData*> to_unref;
@@ -828,6 +831,7 @@ class VersionSet::Builder {
     }
   }
 
+  /** 将文件f插入到v中的第level层 */
   void MaybeAddFile(Version* v, int level, FileMetaData* f) {
     if (levels_[level].deleted_files.count(f->number) > 0) {
       // File is deleted: do nothing
@@ -835,9 +839,12 @@ class VersionSet::Builder {
       std::vector<FileMetaData*>* files = &v->files_[level];
       if (level > 0 && !files->empty()) {
         // Must not overlap
+        /** 判断要插入的文件与已存在的所有文件不存在overlap */
         assert(vset_->icmp_.Compare((*files)[files->size() - 1]->largest,
                                     f->smallest) < 0);
       }
+
+      /** 放入version的files中 */
       f->refs++;
       files->push_back(f);
     }
