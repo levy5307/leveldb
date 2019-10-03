@@ -812,6 +812,7 @@ class VersionSet::Builder {
       std::vector<FileMetaData*>::const_iterator base_end = base_files.end();
       const FileSet* added_files = levels_[level].added_files;
       v->files_[level].reserve(base_files.size() + added_files->size());
+      /** 将base files和added files按顺序添加到version中 */
       for (const auto& added_file : *added_files) {
         // Add all smaller files listed in base_
         for (std::vector<FileMetaData*>::const_iterator bpos =
@@ -830,6 +831,7 @@ class VersionSet::Builder {
 
 #ifndef NDEBUG
       // Make sure there is no overlap in levels > 0
+      /** 打印调试信息: 在level>0时，要确保各个文件间不要有overlap */
       if (level > 0) {
         for (uint32_t i = 1; i < v->files_[level].size(); i++) {
           const InternalKey& prev_end = v->files_[level][i - 1]->largest;
