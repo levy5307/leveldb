@@ -752,6 +752,7 @@ class VersionSet::Builder {
     }
 
     // Delete files
+    /** 将delete files放入到level state中 */
     for (const auto& deleted_file_set_kvp : edit->deleted_files_) {
       const int level = deleted_file_set_kvp.first;
       const uint64_t number = deleted_file_set_kvp.second;
@@ -759,6 +760,7 @@ class VersionSet::Builder {
     }
 
     // Add new files
+    /** 将add files放入到level state中 */
     for (size_t i = 0; i < edit->new_files_.size(); i++) {
       const int level = edit->new_files_[i].first;
       FileMetaData* f = new FileMetaData(edit->new_files_[i].second);
@@ -777,6 +779,19 @@ class VersionSet::Builder {
       // same as the compaction of 40KB of data.  We are a little
       // conservative and allow approximately one seek for every 16KB
       // of data before triggering a compaction.
+      /**
+       * 设置在一定次数的seek操作后自动执行compact操作。
+       * 我们假设：
+       *    1.一次seek操作花费10ms
+       *    2.io(读或者写)1MB花费10ms
+       *    3.1MB的一次compaction操作需要25MB的io
+       *        1MB本层的读操作
+       *        10-12MB次一层的读操作
+       *        10-12MB次一层的写操作
+       * 这意味着对1MB的compaction操作花费和25次的seek操作耗时相同, 也就是说，一次seek操作和40KB的compaction操作花费相同
+       * 我们保守的规定，我们允许每16KB进行一次seek操作后，则触发一次compaction
+       * 所以允许的seek数 = 文件大小 / 16KB
+       **/
       f->allowed_seeks = static_cast<int>((f->file_size / 16384U));
       if (f->allowed_seeks < 100) f->allowed_seeks = 100;
 
