@@ -743,6 +743,7 @@ class VersionSet::Builder {
   }
 
   // Apply all of the edits in *edit to the current state.
+  /** 将VersionEdit *edit应用到当前state中 */
   void Apply(VersionEdit* edit) {
     // Update compaction pointers
     for (size_t i = 0; i < edit->compact_pointers_.size(); i++) {
@@ -1230,6 +1231,7 @@ Status VersionSet::WriteSnapshot(log::Writer* log) {
   return log->AddRecord(record);
 }
 
+/** 第level层的文件数量 */
 int VersionSet::NumLevelFiles(int level) const {
   assert(level >= 0);
   assert(level < config::kNumLevels);
@@ -1291,6 +1293,7 @@ void VersionSet::AddLiveFiles(std::set<uint64_t>* live) {
   }
 }
 
+/** 第level层的文件总大小 */
 int64_t VersionSet::NumLevelBytes(int level) const {
   assert(level >= 0);
   assert(level < config::kNumLevels);

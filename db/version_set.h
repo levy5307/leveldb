@@ -218,6 +218,7 @@ class VersionSet {
   // Arrange to reuse "file_number" unless a newer file number has
   // already been allocated.
   // REQUIRES: "file_number" was returned by a call to NewFileNumber().
+  /** 如果file_number是最新的文件number，则重用该file number */
   void ReuseFileNumber(uint64_t file_number) {
     if (next_file_number_ == file_number + 1) {
       next_file_number_ = file_number;
@@ -225,9 +226,11 @@ class VersionSet {
   }
 
   // Return the number of Table files at the specified level.
+  /** 第level层的文件数量 */
   int NumLevelFiles(int level) const;
 
   // Return the combined file size of all files at the specified level.
+  /** 第level层的文件总大小 */
   int64_t NumLevelBytes(int level) const;
 
   // Return the last sequence number.
