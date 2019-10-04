@@ -1201,6 +1201,7 @@ void VersionSet::Finalize(Version* v) {
   v->compaction_score_ = best_score;
 }
 
+/** 将当前version set写入log */
 Status VersionSet::WriteSnapshot(log::Writer* log) {
   // TODO: Break up into multiple records to reduce memory usage on recovery?
 
@@ -1209,6 +1210,7 @@ Status VersionSet::WriteSnapshot(log::Writer* log) {
   edit.SetComparatorName(icmp_.user_comparator()->Name());
 
   // Save compaction pointers
+  /** compact pointers --> edit */
   for (int level = 0; level < config::kNumLevels; level++) {
     if (!compact_pointer_[level].empty()) {
       InternalKey key;
@@ -1218,6 +1220,7 @@ Status VersionSet::WriteSnapshot(log::Writer* log) {
   }
 
   // Save files
+  /** 各level的所有文件 --> edit */
   for (int level = 0; level < config::kNumLevels; level++) {
     const std::vector<FileMetaData*>& files = current_->files_[level];
     for (size_t i = 0; i < files.size(); i++) {
@@ -1226,6 +1229,7 @@ Status VersionSet::WriteSnapshot(log::Writer* log) {
     }
   }
 
+  /** 将edit写入record, 再写入log */
   std::string record;
   edit.EncodeTo(&record);
   return log->AddRecord(record);
@@ -1238,6 +1242,7 @@ int VersionSet::NumLevelFiles(int level) const {
   return current_->files_[level].size();
 }
 
+/** 将各个level文件大小输出到scratch中, 并返回 */
 const char* VersionSet::LevelSummary(LevelSummaryStorage* scratch) const {
   // Update code if kNumLevels changes
   static_assert(config::kNumLevels == 7, "");
@@ -1249,16 +1254,25 @@ const char* VersionSet::LevelSummary(LevelSummaryStorage* scratch) const {
   return scratch->buffer;
 }
 
+/** 获取ikey在所有文件中的近似偏移 */
 uint64_t VersionSet::ApproximateOffsetOf(Version* v, const InternalKey& ikey) {
   uint64_t result = 0;
+  /** 遍历所有层中的所有文件 */
   for (int level = 0; level < config::kNumLevels; level++) {
     const std::vector<FileMetaData*>& files = v->files_[level];
     for (size_t i = 0; i < files.size(); i++) {
       if (icmp_.Compare(files[i]->largest, ikey) <= 0) {
+        /** largest <= ikey: 如果files[i]中的所有key都小于ikey，将result+files[i] size, 继续下一个文件 */
         // Entire file is before "ikey", so just add the file size
         result += files[i]->file_size;
       } else if (icmp_.Compare(files[i]->smallest, ikey) > 0) {
         // Entire file is after "ikey", so ignore
+        /**
+         * largest > ikey, smallest > ikey
+         * 当前文件所有的key都大于ikey:
+         *   1.如果level>0, 由于level>0时，文件间key有序，所以不用继续往下找了, 后面的文件肯定也都比ikey大
+         *   2.如果level=0, 由于level=0时，文件间有overlap，所以还需要继续找
+         **/
         if (level > 0) {
           // Files other than level 0 are sorted by meta->smallest, so
           // no further files in this level will contain data for
@@ -1268,6 +1282,7 @@ uint64_t VersionSet::ApproximateOffsetOf(Version* v, const InternalKey& ikey) {
       } else {
         // "ikey" falls in the range for this table.  Add the
         // approximate offset of "ikey" within the table.
+        /** 获取ikey在该file中的偏移 */
         Table* tableptr;
         Iterator* iter = table_cache_->NewIterator(
             ReadOptions(), files[i]->number, files[i]->file_size, &tableptr);
@@ -1281,11 +1296,15 @@ uint64_t VersionSet::ApproximateOffsetOf(Version* v, const InternalKey& ikey) {
   return result;
 }
 
+/** 获取所有version、所有level、所有file的number */
 void VersionSet::AddLiveFiles(std::set<uint64_t>* live) {
+  /** 遍历所有version */
   for (Version* v = dummy_versions_.next_; v != &dummy_versions_;
        v = v->next_) {
+    /** 遍历所有level */
     for (int level = 0; level < config::kNumLevels; level++) {
       const std::vector<FileMetaData*>& files = v->files_[level];
+      /** 该level的所有文件 */
       for (size_t i = 0; i < files.size(); i++) {
         live->insert(files[i]->number);
       }
@@ -1300,10 +1319,13 @@ int64_t VersionSet::NumLevelBytes(int level) const {
   return TotalFileSize(current_->files_[level]);
 }
 
+/** 对所有level、所有文件，找到某文件f，其与其他文件的overlap最大 */
 int64_t VersionSet::MaxNextLevelOverlappingBytes() {
   int64_t result = 0;
   std::vector<FileMetaData*> overlaps;
+  /** 对所有level */
   for (int level = 1; level < config::kNumLevels - 1; level++) {
+    /** 该level的所有文件 */
     for (size_t i = 0; i < current_->files_[level].size(); i++) {
       const FileMetaData* f = current_->files_[level][i];
       current_->GetOverlappingInputs(level + 1, &f->smallest, &f->largest,
@@ -1320,6 +1342,7 @@ int64_t VersionSet::MaxNextLevelOverlappingBytes() {
 // Stores the minimal range that covers all entries in inputs in
 // *smallest, *largest.
 // REQUIRES: inputs is not empty
+/** 对于所有文件inputs，找到其所有文件中的最小key --> smallest和最大key --> largest */
 void VersionSet::GetRange(const std::vector<FileMetaData*>& inputs,
                           InternalKey* smallest, InternalKey* largest) {
   assert(!inputs.empty());
@@ -1344,6 +1367,7 @@ void VersionSet::GetRange(const std::vector<FileMetaData*>& inputs,
 // Stores the minimal range that covers all entries in inputs1 and inputs2
 // in *smallest, *largest.
 // REQUIRES: inputs is not empty
+/** 对于所有文件inputs1和inputs2，找到其所有文件中的最小key --> smallest和最大key --> largest */
 void VersionSet::GetRange2(const std::vector<FileMetaData*>& inputs1,
                            const std::vector<FileMetaData*>& inputs2,
                            InternalKey* smallest, InternalKey* largest) {
@@ -1441,6 +1465,7 @@ Compaction* VersionSet::PickCompaction() {
 
 // Finds the largest key in a vector of files. Returns true if files it not
 // empty.
+/** 找出所有文件files中最大的key */
 bool FindLargestKey(const InternalKeyComparator& icmp,
                     const std::vector<FileMetaData*>& files,
                     InternalKey* largest_key) {
@@ -1459,6 +1484,15 @@ bool FindLargestKey(const InternalKeyComparator& icmp,
 
 // Finds minimum file b2=(l2, u2) in level file for which l2 > u1 and
 // user_key(l2) = user_key(u1)
+/**
+ * 找到所有文件level_files中的一个文件f，满足如下条件：
+ *  1.f中的smallest>lagest_key
+ *  2.f中的smallest.user_key==lasest_key.user_key
+ *  3.如果有多个file满足条件，则选择smallest最小的一个f, 这里的最小参照InternalKeyComparator::compare函数, 即：
+ *      1> 首先，按照key升序
+ *      2> 相同的key，按照sequence降序
+ *      3> 相同的key和sequence，按照type降序
+ **/
 FileMetaData* FindSmallestBoundaryFile(
     const InternalKeyComparator& icmp,
     const std::vector<FileMetaData*>& level_files,
@@ -1499,6 +1533,7 @@ void AddBoundaryInputs(const InternalKeyComparator& icmp,
   InternalKey largest_key;
 
   // Quick return if compaction_files is empty.
+  /** 找到compaction_files中的最大key --> largest_key */
   if (!FindLargestKey(icmp, *compaction_files, &largest_key)) {
     return;
   }
@@ -1510,9 +1545,11 @@ void AddBoundaryInputs(const InternalKeyComparator& icmp,
 
     // If a boundary file was found advance largest_key, otherwise we're done.
     if (smallest_boundary_file != NULL) {
+      /** 本次找到smallest boundary file, 放入到compaction files后继续 */
       compaction_files->push_back(smallest_boundary_file);
       largest_key = smallest_boundary_file->largest;
     } else {
+      /** 本次没有找到smallest boundary file，则不继续找了 */
       continue_searching = false;
     }
   }
