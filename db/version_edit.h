@@ -31,6 +31,11 @@ struct FileMetaData {
   InternalKey largest;   // Largest internal key served by table
 };
 
+/**
+ * compact过程中会有一系列改变当前Version的操作（FileNumber增加，删除input的sstable，增加
+ * 输出的sstable等等），为了缩小Version切换的时间点，将这些操作封装成VersionEdit，compact
+ * 完成时，将VersionEdit中的操作一次应用到当前Version即可得到最新状态的Version
+ **/
 class VersionEdit {
  public:
   VersionEdit() { Clear(); }

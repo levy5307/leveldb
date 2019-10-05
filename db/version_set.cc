@@ -1168,6 +1168,7 @@ void VersionSet::Finalize(Version* v) {
   int best_level = -1;
   double best_score = -1;
 
+  /** 计算Version *v的compaction level及其compaction score */
   for (int level = 0; level < config::kNumLevels - 1; level++) {
     double score;
     if (level == 0) {
@@ -1182,10 +1183,20 @@ void VersionSet::Finalize(Version* v) {
       // file size is small (perhaps because of a small write-buffer
       // setting, or very high compression ratios, or lots of
       // overwrites/deletions).
+      /**
+       * level 0使用文件数量，而不是文件总大小来计算score, 原因如下：
+       *    1.对于比较write buffer比较大的情况，最好不要做太多的level 0 compaction
+       *    2.level 0的文件在每次read的时候都会merge，所以当文件的都比较小时，我们希望避免在level 0有太多的文件
+       **/
       score = v->files_[level].size() /
               static_cast<double>(config::kL0_CompactionTrigger);
     } else {
       // Compute the ratio of current size to size limit.
+      /**
+       * score = total bytes for this level / max bytes for this level
+       * 当前的策略是设置初始值kBaseLevelSize，然后以10的指数级按level增长。每个level可以容纳的quota_size =
+       * kBaseLevelSize * 10^(level_number-1)。所以level 1可以容纳总共kBaseLevelSize的sstable，level 2允许kBaseLevelSize*10
+       **/
       const uint64_t level_bytes = TotalFileSize(v->files_[level]);
       score =
           static_cast<double>(level_bytes) / MaxBytesForLevel(options_, level);
