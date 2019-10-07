@@ -200,6 +200,11 @@ class VersionSet {
   // current version.  Will release *mu while actually writing to the file.
   // REQUIRES: *mu is held on entry.
   // REQUIRES: no other thread concurrently calls LogAndApply()
+
+  /**
+   * 以当前Version为基准构造新的Version，VersionSet::Builder将VersionEdit应用在新Version上，
+   * 最后将新Version生效成VersionSet::current_。
+   **/
   Status LogAndApply(VersionEdit* edit, port::Mutex* mu)
       EXCLUSIVE_LOCKS_REQUIRED(mu);
 
@@ -302,6 +307,7 @@ class VersionSet {
 
   bool ReuseManifest(const std::string& dscname, const std::string& dscbase);
 
+  /** 计算Version *v的compaction level及其compaction score */
   void Finalize(Version* v);
 
   void GetRange(const std::vector<FileMetaData*>& inputs, InternalKey* smallest,
@@ -334,7 +340,7 @@ class VersionSet {
   log::Writer* descriptor_log_;
   /** version链表的表头（双向循环链表） */
   Version dummy_versions_;  // Head of circular doubly-linked list of versions.
-  /** 指向头结点的next，也就是最新插入的结点 */
+  /** 当前version: 指向头结点的next，也就是最新插入的结点 */
   Version* current_;        // == dummy_versions_.prev_
 
   // Per-level key at which the next compaction at that level should start.
