@@ -956,6 +956,7 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
     s = env_->NewWritableFile(new_manifest_file, &descriptor_file_);
     if (s.ok()) {
       descriptor_log_ = new log::Writer(descriptor_file_);
+      /** 将当前version写入descriptor log */
       s = WriteSnapshot(descriptor_log_);
     }
   }

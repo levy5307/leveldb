@@ -329,9 +329,13 @@ class VersionSet {
   const Options* const options_;
   TableCache* const table_cache_;
   const InternalKeyComparator icmp_;
+  /** 下一个可用的FileNumber */
   uint64_t next_file_number_;
+  /** manifest文件的FileNumber */
   uint64_t manifest_file_number_;
+  /** 最后用过的 SequnceNumber */
   uint64_t last_sequence_;
+  /** log 文件的 FileNumber */
   uint64_t log_number_;
   uint64_t prev_log_number_;  // 0 or backing store for memtable being compacted
 
