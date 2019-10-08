@@ -58,7 +58,7 @@ class WritableFile;
  *
  * ------------------------------------------------------------------------------------
  * VersionSet::Builder:
- *   将VersionEdit应用到VersonSet上的过程封装成VersionSet::Builder. 主要是更新Version::files_[]
+ *   将VersionEdit应用的过程封装成VersionSet::Builder. 主要是更新Version::files_[]
  *
  **/
 
