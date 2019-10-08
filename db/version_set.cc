@@ -704,6 +704,13 @@ class VersionSet::Builder {
     FileSet* added_files;
   };
 
+  /**
+   * 以base_->files_[level]为基准，根据levels_中LevelStat的deleted_files/added_files做merge，
+   * 输出到新Version的files_[level] (VersionSet::~::SaveTo()).
+   *   1）对于每个level n，base_->files_[n]与added_files做merge，输出到新Version的files_[n]中。
+   *   过程中根据deleted_files将要删除的丢弃掉（VersionSet::Builder::MaybeAddFile()）
+   *   2）处理完成，新Version中的files_[level]有了最新的sstable集合（FileMetaData）
+   * */
   VersionSet* vset_;
   Version* base_;
   LevelState levels_[config::kNumLevels];
@@ -1021,6 +1028,7 @@ Status VersionSet::Recover(bool* save_manifest) {
   };
 
   // Read "CURRENT" file, which contains a pointer to the current manifest file
+  /** 读取dbname_/CURRENT的内容到current中 */
   std::string current;
   Status s = ReadFileToString(env_, CurrentFileName(dbname_), &current);
   if (!s.ok()) {
@@ -1031,6 +1039,7 @@ Status VersionSet::Recover(bool* save_manifest) {
   }
   current.resize(current.size() - 1);
 
+  /** dbname_/CURRENT中的内容是descriptor file name */
   std::string dscname = dbname_ + "/" + current;
   SequentialFile* file;
   s = env_->NewSequentialFile(dscname, &file);

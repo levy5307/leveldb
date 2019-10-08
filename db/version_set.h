@@ -38,6 +38,29 @@ class TableCache;
 class Version;
 class VersionSet;
 class WritableFile;
+/**
+ * ------------------------------------------------------------------------------------
+ * manifest file: {dbname_}/MANIFEST-{manifest_file_number_}
+ *   为了重启db后可以恢复退出前的状态，需要将db中的状态保存下来，这些状态信息就保存在manifeest 文件中。
+ *   当db出现异常时，为了能够尽可能多的恢复，manifest中不会只保存当前的状态，而是将历史的状态都保存下来。
+ *   又考虑到每次状态的完全保存需要的空间和耗费的时间会较多，
+ *   当前采用的方式是，只在manifest开始保存完整的状态信息（VersionSet::WriteSnapshot（）），接下来只保存每次compact 产生的操作（VesrionEdit），
+ *   重启db时，根据开头的起始状态，依次将后续的VersionEdit replay，即可恢复到退出前的状态（Vesrion）。
+ *
+ * ------------------------------------------------------------------------------------
+ * current file: {dbname_}/CURRENT
+ *   保存manifest file name
+ *
+ * ------------------------------------------------------------------------------------
+ * VersionSet:
+ *   compact过程中会有一系列改变当前Version的操作（FileNumber增加，删除input的sstable，增加输出的sstable……），
+ *   为了缩小Version切换的时间点，将这些操作封装成VersionEdit，compact完成时，将VersionEdit中的操作一次应用到当前Version即可得到最新状态的Version。
+ *
+ * ------------------------------------------------------------------------------------
+ * VersionSet::Builder:
+ *   将VersionEdit应用到VersonSet上的过程封装成VersionSet::Builder. 主要是更新Version::files_[]
+ *
+ **/
 
 // Return the smallest index i such that files[i]->largest >= key.
 // Return files.size() if there is no such file.
@@ -186,6 +209,9 @@ class Version {
   int compaction_level_;
 };
 
+/**
+ * 整个db的当前状态被VersionSet管理着，其中有当前最新的Version以及其他正在服务的Version链表
+ **/
 class VersionSet {
  public:
   VersionSet(const std::string& dbname, const Options* options,
