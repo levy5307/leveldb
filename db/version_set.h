@@ -60,6 +60,10 @@ class WritableFile;
  * VersionSet::Builder:
  *   将VersionEdit应用的过程封装成VersionSet::Builder. 主要是更新Version::files_[]
  *
+ * ------------------------------------------------------------------------------------
+ * VersionEdit:
+ *   表示Version之间的变化，相当于delta增量。Version0 + VersionEdit-->Version1
+ *
  **/
 
 // Return the smallest index i such that files[i]->largest >= key.

@@ -1153,6 +1153,11 @@ bool VersionSet::ReuseManifest(const std::string& dscname,
   if (!options_->reuse_logs) {
     return false;
   }
+
+  /**
+   * 通过解析文件名获取type和number, 并获取该文件size:
+   *    如果文件过大，则不允许reuse
+   **/
   FileType manifest_type;
   uint64_t manifest_number;
   uint64_t manifest_size;
@@ -1166,6 +1171,7 @@ bool VersionSet::ReuseManifest(const std::string& dscname,
 
   assert(descriptor_file_ == nullptr);
   assert(descriptor_log_ == nullptr);
+  /** 根据dscname生成一个新的文件，覆盖掉老的文件 */
   Status r = env_->NewAppendableFile(dscname, &descriptor_file_);
   if (!r.ok()) {
     Log(options_->info_log, "Reuse MANIFEST: %s\n", r.ToString().c_str());
