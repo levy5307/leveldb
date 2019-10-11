@@ -750,7 +750,7 @@ class VersionSet::Builder {
   }
 
   // Apply all of the edits in *edit to the current state.
-  /** 将VersionEdit *edit应用到当前state中 */
+  /** 将VersionEdit *edit应用到builder */
   void Apply(VersionEdit* edit) {
     // Update compaction pointers
     for (size_t i = 0; i < edit->compact_pointers_.size(); i++) {
@@ -948,8 +948,12 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   // Initialize new descriptor log file if necessary by creating
   // a temporary file that contains a snapshot of the current version.
   /**
-   * 如果descriptor_log=null, 则创建descriptor log，并将current version写入descriptor log
+   * 如果descriptor_log不存在时, 则创建descriptor log，并将current version写入descriptor log
    * 只有在第一次调用该函数时才会执行到这里（即打开该db时），所以也不用加互斥锁
+   *
+   * 这里的代码也表明，对于descriptor log，先写入一个version(WriteSnapshot),
+   * 然后保存每次compact产生的version edit(s = descriptor_log_->AddRecord(record);)
+   * 正如version_set.h文件开始处注释中关于manifest file的描述
    **/
   std::string new_manifest_file;
   Status s;
@@ -1028,7 +1032,7 @@ Status VersionSet::Recover(bool* save_manifest) {
   };
 
   // Read "CURRENT" file, which contains a pointer to the current manifest file
-  /** 读取dbname_/CURRENT的内容到current中 */
+  /** 读取dbname_/CURRENT文件的内容到std::string current中 */
   std::string current;
   Status s = ReadFileToString(env_, CurrentFileName(dbname_), &current);
   if (!s.ok()) {
@@ -1039,7 +1043,7 @@ Status VersionSet::Recover(bool* save_manifest) {
   }
   current.resize(current.size() - 1);
 
-  /** dbname_/CURRENT中的内容是descriptor file name */
+  /** dbname_/CURRENT文件中的内容是descriptor file name, 打开descriptor file */
   std::string dscname = dbname_ + "/" + current;
   SequentialFile* file;
   s = env_->NewSequentialFile(dscname, &file);
@@ -1059,6 +1063,7 @@ Status VersionSet::Recover(bool* save_manifest) {
   uint64_t last_sequence = 0;
   uint64_t log_number = 0;
   uint64_t prev_log_number = 0;
+  /** 根据当前version创建builder */
   Builder builder(this, current_);
 
   {
@@ -1068,7 +1073,9 @@ Status VersionSet::Recover(bool* save_manifest) {
                        0 /*initial_offset*/);
     Slice record;
     std::string scratch;
+    /** 读取record */
     while (reader.ReadRecord(&record, &scratch) && s.ok()) {
+      /** 将record解析成version edit */
       VersionEdit edit;
       s = edit.DecodeFrom(record);
       if (s.ok()) {
@@ -1080,6 +1087,7 @@ Status VersionSet::Recover(bool* save_manifest) {
         }
       }
 
+      /** 将VersionEdit *edit应用到builder中 */
       if (s.ok()) {
         builder.Apply(&edit);
       }
@@ -1126,6 +1134,7 @@ Status VersionSet::Recover(bool* save_manifest) {
   }
 
   if (s.ok()) {
+    /** 根据builder生成新的version，计算其compaction level及其compaction score, 并插入到version列表中 */
     Version* v = new Version(this);
     builder.SaveTo(v);
     // Install recovered version
@@ -1138,6 +1147,7 @@ Status VersionSet::Recover(bool* save_manifest) {
     prev_log_number_ = prev_log_number;
 
     // See if we can reuse the existing MANIFEST file.
+    /** reuse该manifest文件 */
     if (ReuseManifest(dscname, current)) {
       // No need to save new manifest
     } else {
@@ -1240,7 +1250,7 @@ void VersionSet::Finalize(Version* v) {
   v->compaction_score_ = best_score;
 }
 
-/** 将当前version写入log */
+/** 将当前version写入log, 先将当前version保存成version_edit，然后将version_edit写入log */
 Status VersionSet::WriteSnapshot(log::Writer* log) {
   // TODO: Break up into multiple records to reduce memory usage on recovery?
 
