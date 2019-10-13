@@ -430,19 +430,37 @@ class Compaction {
 
   Compaction(const Options* options, int level);
 
+  /** 要compact的level */
   int level_;
+  /** 生成的sstable的最大size */
   uint64_t max_output_file_size_;
+  /** compact时当前的version */
   Version* input_version_;
+  /** 记录compact过程中的操作 */
   VersionEdit edit_;
 
   // Each compaction reads inputs from "level_" and "level_+1"
+  /**
+   * inputs_[0]是level_的sstable文件信息
+   * inputs_[1]是level_+1的sstable文件信息
+   **/
   std::vector<FileMetaData*> inputs_[2];  // The two sets of inputs
 
   // State used to check for number of overlapping grandparent files
   // (parent == level_ + 1, grandparent == level_ + 2)
+  /**
+   * 位于level_+2，并且与compact的key-range有overlap的sstable。
+   * 保存grandparents_是因为compact最终会生成一系列level_+1的sstable，
+   * 而如果生成的sstable与level_+2中有过多的overlap的话，当compact
+   * level_+1时，会产生过多的merge，为了尽量避免这种情况，compact过程中
+   * 需要检查与level-n+2中产生overlap的size并与阈值kMaxGrandParentOverlapBytes做比较，
+   * 以便提前中止compact。
+   **/
   std::vector<FileMetaData*> grandparents_;
+  /** 记录compact时grandparents_中已经overlap的index */
   size_t grandparent_index_;  // Index in grandparent_starts_
   bool seen_key_;             // Some output key has been seen
+  /**  记录已经overlap的累计size */
   int64_t overlapped_bytes_;  // Bytes of overlap between current output
                               // and grandparent files
 
@@ -452,6 +470,14 @@ class Compaction {
   // is that we are positioned at one of the file ranges for each
   // higher level than the ones involved in this compaction (i.e. for
   // all L >= level_ + 2).
+  /**
+   * compact时，当key的ValueType是kTypeDeletion时，
+   * 要检查其在level-n+1以上是否存在（IsBaseLevelForKey()）来决定是否丢弃掉该key。
+   * 因为compact时，key的遍历是顺序的，所以每次检查从上一次检查结束的地方开始即可，
+   * level_ptrs_[i]中就记录了input_version_->levels_[i]中，上一次比较结束的sstable的容器下标。
+   *
+   * 我们真正需要的是level>level_+2的层次的数据。
+   **/
   size_t level_ptrs_[config::kNumLevels];
 };
 
