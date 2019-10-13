@@ -471,12 +471,11 @@ class Compaction {
   // higher level than the ones involved in this compaction (i.e. for
   // all L >= level_ + 2).
   /**
-   * compact时，当key的ValueType是kTypeDeletion时，
-   * 要检查其在level-n+1以上是否存在（IsBaseLevelForKey()）来决定是否丢弃掉该key。
-   * 因为compact时，key的遍历是顺序的，所以每次检查从上一次检查结束的地方开始即可，
+   * compact时key的遍历是顺序的，所以每次检查从上一次检查结束的地方开始即可，
    * level_ptrs_[i]中就记录了input_version_->levels_[i]中，上一次比较结束的sstable的容器下标。
+   * (compact时，当key的ValueType是kTypeDeletion时，要检查其在level-n+1以上是否存在（IsBaseLevelForKey()）来决定是否丢弃掉该key)
    *
-   * 我们真正需要的是level>level_+2的层次的数据。
+   * 这里真正需要的是level>level_+2的层次中的、某一文件的内容下标。
    **/
   size_t level_ptrs_[config::kNumLevels];
 };
