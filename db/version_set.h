@@ -406,22 +406,27 @@ class Compaction {
 
   // Is this a trivial compaction that can be implemented by just
   // moving a single input file to the next level (no merging or splitting)
+  /** trivial move: 只需要把一个文件移动到下一个level */
   bool IsTrivialMove() const;
 
   // Add all inputs to this compaction as delete operations to *edit.
+  /** 将所有本次compaction操作的input文件，在edit中标记为删除 */
   void AddInputDeletions(VersionEdit* edit);
 
   // Returns true if the information we have available guarantees that
   // the compaction is producing data in "level+1" for which no data exists
   // in levels greater than "level+1".
+  /** 如果user_key在level_+1以上的的level中不存在，返回true(user_key是compaction产生的在level+1中的) */
   bool IsBaseLevelForKey(const Slice& user_key);
 
-  // Returns true iff we should stop building the current output
+  // Returns true if we should stop building the current output
   // before processing "internal_key".
+  /** 在处理internal_key之前，如果当前与grandparent层产生overlap的size超过阈值, 返回true */
   bool ShouldStopBefore(const Slice& internal_key);
 
   // Release the input version for the compaction, once the compaction
   // is successful.
+  /** 当compaction成功执行完后，释放掉input_verison_ */
   void ReleaseInputs();
 
  private:
