@@ -1744,6 +1744,7 @@ bool Compaction::IsBaseLevelForKey(const Slice& user_key) {
       if (user_cmp->Compare(user_key, f->largest.user_key()) <= 0) {
         // We've advanced far enough
         if (user_cmp->Compare(user_key, f->smallest.user_key()) >= 0) {
+          /** user_key落在了lvl层的f文件中，返回false */
           // Key falls in this file's range, so definitely not base level
           return false;
         }
@@ -1752,6 +1753,8 @@ bool Compaction::IsBaseLevelForKey(const Slice& user_key) {
       level_ptrs_[lvl]++;
     }
   }
+  
+  /** user_key没有落在level > level_ + 2中的任何文件中，返回true */
   return true;
 }
 
@@ -1770,6 +1773,7 @@ bool Compaction::ShouldStopBefore(const Slice& internal_key) {
   }
   seen_key_ = true;
 
+  /** 过多的overlap，则返回true，不再继续compact */
   if (overlapped_bytes_ > MaxGrandParentOverlapBytes(vset->options_)) {
     // Too much overlap for current output; start new output
     overlapped_bytes_ = 0;

@@ -416,7 +416,7 @@ class Compaction {
   // Returns true if the information we have available guarantees that
   // the compaction is producing data in "level+1" for which no data exists
   // in levels greater than "level+1".
-  /** 如果user_key在level_+1以上的的level中不存在，返回true(user_key是compaction产生的在level+1中的) */
+  /** 如果user_key在level > level_+2中的所有文件中均不存在，返回true(user_key是compaction产生的在level+1层的文件中的) */
   bool IsBaseLevelForKey(const Slice& user_key);
 
   // Returns true if we should stop building the current output
@@ -458,14 +458,14 @@ class Compaction {
    * 保存grandparents_是因为compact最终会生成一系列level_+1的sstable，
    * 而如果生成的sstable与level_+2中有过多的overlap的话，当compact
    * level_+1时，会产生过多的merge，为了尽量避免这种情况，compact过程中
-   * 需要检查与level-n+2中产生overlap的size并与阈值kMaxGrandParentOverlapBytes做比较，
+   * 需要检查与level_+2中产生overlap的size并与阈值kMaxGrandParentOverlapBytes做比较，
    * 以便提前中止compact。
    **/
   std::vector<FileMetaData*> grandparents_;
-  /** 记录compact时grandparents_中已经overlap的index */
+  /** grandparents_的下标 */
   size_t grandparent_index_;  // Index in grandparent_starts_
   bool seen_key_;             // Some output key has been seen
-  /**  记录已经overlap的累计size */
+  /** 记录compact output sstable和level_+2中文件的overlap的size */
   int64_t overlapped_bytes_;  // Bytes of overlap between current output
                               // and grandparent files
 
@@ -480,7 +480,7 @@ class Compaction {
    * level_ptrs_[i]中就记录了input_version_->levels_[i]中，上一次比较结束的sstable的容器下标。
    * (compact时，当key的ValueType是kTypeDeletion时，要检查其在level-n+1以上是否存在（IsBaseLevelForKey()）来决定是否丢弃掉该key)
    *
-   * 这里真正需要的是level>level_+2的层次中的、某一文件的内容下标。
+   * 这里真正需要的是level>level_+2的层次中的所有文件的下标(例如files[0]中的0)。
    **/
   size_t level_ptrs_[config::kNumLevels];
 };
