@@ -308,7 +308,12 @@ class VersionSet {
   // The caller should delete the iterator when no longer needed.
   Iterator* MakeInputIterator(Compaction* c);
 
-  // Returns true iff some level needs a compaction.
+  // Returns true if some level needs a compaction.
+  /**
+   * 当以下条件二者满足其一时，代表需要进行compact:
+   *   1.current_->compactioni_socre_ >= 1，
+   *   2.current_->file_to_compact_ != null
+   **/
   bool NeedsCompaction() const {
     Version* v = current_;
     return (v->compaction_score_ >= 1) || (v->file_to_compact_ != nullptr);
@@ -316,6 +321,7 @@ class VersionSet {
 
   // Add all files listed in any live version to *live.
   // May also mutate some internal state.
+  /** 获取所有version、所有level、所有file的number */
   void AddLiveFiles(std::set<uint64_t>* live);
 
   // Return the approximate offset in the database of the data for
@@ -340,9 +346,11 @@ class VersionSet {
   /** 计算Version *v的compaction level及其compaction score */
   void Finalize(Version* v);
 
+  /** 对于所有文件inputs，找到其所有文件中的最小key --> smallest和最大key --> largest */
   void GetRange(const std::vector<FileMetaData*>& inputs, InternalKey* smallest,
                 InternalKey* largest);
 
+  /** 对于所有文件inputs1和inputs2，找到其所有文件中的最小key --> smallest和最大key --> largest */
   void GetRange2(const std::vector<FileMetaData*>& inputs1,
                  const std::vector<FileMetaData*>& inputs2,
                  InternalKey* smallest, InternalKey* largest);

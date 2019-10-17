@@ -172,6 +172,10 @@ bool SomeFileOverlapsRange(const InternalKeyComparator& icmp,
 // is the largest key that occurs in the file, and value() is an
 // 16-byte value containing the file number and file size, both
 // encoded using EncodeFixed64.
+/**
+ * 给予一个指定的version/level，使用LevelFileNumIterator便可以管理该level的所有files，
+ * 对于一个给定的entry, key()代表该文件的最大key，value()是一个保存了file number和file size的16-byte的数据，使用EncodeFixed64编码
+ * */
 class Version::LevelFileNumIterator : public Iterator {
  public:
   LevelFileNumIterator(const InternalKeyComparator& icmp,
@@ -1224,7 +1228,7 @@ void VersionSet::Finalize(Version* v) {
       /**
        * level 0使用文件数量，而不是文件总大小来计算score, 原因如下：
        *    1.对于比较write buffer比较大的情况，最好不要做太多的level 0 compaction
-       *    2.level 0的文件在每次read的时候都会merge，所以当文件的都比较小时，我们希望避免在level 0有太多的文件
+       *    2.level 0的文件在每次read的时候都会merge，所以当文件都比较小时，我们希望避免在level 0有太多的文件
        **/
       score = v->files_[level].size() /
               static_cast<double>(config::kL0_CompactionTrigger);
@@ -1438,6 +1442,7 @@ Iterator* VersionSet::MakeInputIterator(Compaction* c) {
   int num = 0;
   for (int which = 0; which < 2; which++) {
     if (!c->inputs_[which].empty()) {
+      /** 对于level-0层的文件，每个文件创建一个iterator，则为每一层统一创建一个two level iterator */
       if (c->level() + which == 0) {
         const std::vector<FileMetaData*>& files = c->inputs_[which];
         for (size_t i = 0; i < files.size(); i++) {
@@ -1753,7 +1758,7 @@ bool Compaction::IsBaseLevelForKey(const Slice& user_key) {
       level_ptrs_[lvl]++;
     }
   }
-  
+
   /** user_key没有落在level > level_ + 2中的任何文件中，返回true */
   return true;
 }
