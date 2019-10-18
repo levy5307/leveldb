@@ -1420,7 +1420,7 @@ void VersionSet::GetRange(const std::vector<FileMetaData*>& inputs,
 // Stores the minimal range that covers all entries in inputs1 and inputs2
 // in *smallest, *largest.
 // REQUIRES: inputs is not empty
-/** 对于所有文件inputs1和inputs2，找到其所有文件中的最小key --> smallest和最大key --> largest */
+/** 对于所有文件inputs1和inputs2，找到其所有文件中的最小key --> smallest, 最大key --> largest */
 void VersionSet::GetRange2(const std::vector<FileMetaData*>& inputs1,
                            const std::vector<FileMetaData*>& inputs2,
                            InternalKey* smallest, InternalKey* largest) {
@@ -1613,13 +1613,16 @@ void VersionSet::SetupOtherInputs(Compaction* c) {
   const int level = c->level();
   InternalKey smallest, largest;
 
+  /** 将boundary input files添加到c->inputs_[0]中，并找到其最大key和最小key */
   AddBoundaryInputs(icmp_, current_->files_[level], &c->inputs_[0]);
   GetRange(c->inputs_[0], &smallest, &largest);
 
+  /** 找到level+1中与smallest和largest有overlap的文件 --> c->inputs_[1] */
   current_->GetOverlappingInputs(level + 1, &smallest, &largest,
                                  &c->inputs_[1]);
 
   // Get entire range covered by compaction
+  /** inputs[0]和inputs[1]中所有文件的最小key --> all_start, 最大key --> all_limit */
   InternalKey all_start, all_limit;
   GetRange2(c->inputs_[0], c->inputs_[1], &all_start, &all_limit);
 
@@ -1672,6 +1675,7 @@ void VersionSet::SetupOtherInputs(Compaction* c) {
 
 Compaction* VersionSet::CompactRange(int level, const InternalKey* begin,
                                      const InternalKey* end) {
+  /** 获取所有与[begin, end]有overlap的文件 --> inputs */
   std::vector<FileMetaData*> inputs;
   current_->GetOverlappingInputs(level, begin, end, &inputs);
   if (inputs.empty()) {
@@ -1682,6 +1686,10 @@ Compaction* VersionSet::CompactRange(int level, const InternalKey* begin,
   // But we cannot do this for level-0 since level-0 files can overlap
   // and we must not pick one file and drop another older file if the
   // two files overlap.
+  /**
+   * level > 0时，一次执行compaction的范围不要太大。但是level = 0时除外，
+   * 因为level = 0的文件有overlap，不可能处理了前面一个，后面一个与前一个有重叠的文件不处理
+   **/
   if (level > 0) {
     const uint64_t limit = MaxFileSizeForLevel(options_, level);
     uint64_t total = 0;
@@ -1695,10 +1703,14 @@ Compaction* VersionSet::CompactRange(int level, const InternalKey* begin,
     }
   }
 
+  /**
+   * 生成Compaction, input_version_为当前版本，input[0]=在上面获取到包含[begin, end]的文件集合
+   **/
   Compaction* c = new Compaction(options_, level);
   c->input_version_ = current_;
   c->input_version_->Ref();
   c->inputs_[0] = inputs;
+  // todo: 计算input0和input1
   SetupOtherInputs(c);
   return c;
 }
