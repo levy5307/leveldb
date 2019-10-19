@@ -1502,6 +1502,7 @@ Compaction* VersionSet::PickCompaction() {
   c->input_version_->Ref();
 
   // Files in level 0 may overlap each other, so pick up all overlapping ones
+  /** 如果是level 0，由于level 0的文件间有overlap，所以要找到overlap的文件存入inputs[0]中 */
   if (level == 0) {
     InternalKey smallest, largest;
     GetRange(c->inputs_[0], &smallest, &largest);
@@ -1617,7 +1618,10 @@ void VersionSet::SetupOtherInputs(Compaction* c) {
   AddBoundaryInputs(icmp_, current_->files_[level], &c->inputs_[0]);
   GetRange(c->inputs_[0], &smallest, &largest);
 
-  /** 找到level+1中与smallest和largest有overlap的文件 --> c->inputs_[1] */
+  /**
+   * 获取level+1层的文件：
+   *   找到level+1中与level中的smallest和largest有overlap的文件 --> c->inputs_[1]
+   **/
   current_->GetOverlappingInputs(level + 1, &smallest, &largest,
                                  &c->inputs_[1]);
 
@@ -1628,6 +1632,7 @@ void VersionSet::SetupOtherInputs(Compaction* c) {
 
   // See if we can grow the number of inputs in "level" without
   // changing the number of "level+1" files we pick up.
+  /** 看能否在不增长level+1层文件数量的前提下expand level层的文件数量 */
   if (!c->inputs_[1].empty()) {
     std::vector<FileMetaData*> expanded0;
     current_->GetOverlappingInputs(level, &all_start, &all_limit, &expanded0);
