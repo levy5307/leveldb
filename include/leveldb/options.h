@@ -56,6 +56,7 @@ struct LEVELDB_EXPORT Options {
   // errors.  This may have unforeseen ramifications: for example, a
   // corruption of one DB entry may cause a large number of entries to
   // become unreadable or for the entire DB to become unopenable.
+  /** paranoid=偏执的 */
   bool paranoid_checks = false;
 
   // Use the specified object to interact with the environment,

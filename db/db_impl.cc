@@ -92,6 +92,7 @@ static void ClipToRange(T* ptr, V minvalue, V maxvalue) {
   if (static_cast<V>(*ptr) > maxvalue) *ptr = maxvalue;
   if (static_cast<V>(*ptr) < minvalue) *ptr = minvalue;
 }
+/** 矫正参数options */
 Options SanitizeOptions(const std::string& dbname,
                         const InternalKeyComparator* icmp,
                         const InternalFilterPolicy* ipolicy,
@@ -233,6 +234,7 @@ void DBImpl::DeleteObsoleteFiles() {
   std::set<uint64_t> live = pending_outputs_;
   versions_->AddLiveFiles(&live);
 
+  /** 从dbname_路径下获取所有文件，并根据不同类型逐个判断文件是否可以删除 */
   std::vector<std::string> filenames;
   env_->GetChildren(dbname_, &filenames);  // Ignoring errors on purpose
   uint64_t number;
@@ -295,6 +297,10 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
   // may already exist from a previous failed creation attempt.
   env_->CreateDir(dbname_);
   assert(db_lock_ == nullptr);
+  /**
+   * 为lock file(file name={dbname_}/LOCK)上强制锁,
+   * 同一时间只有一个进程可以上锁成功，也就保证了接下来的代码只有一个进程会执行
+   **/
   Status s = env_->LockFile(LockFileName(dbname_), &db_lock_);
   if (!s.ok()) {
     return s;
