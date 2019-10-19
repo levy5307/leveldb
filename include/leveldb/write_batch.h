@@ -70,6 +70,7 @@ class LEVELDB_EXPORT WriteBatch {
   void Append(const WriteBatch& source);
 
   // Support for iterating over the contents of a batch.
+  /** 遍历将rep_中的内容写入handler */
   Status Iterate(Handler* handler) const;
 
  private:
