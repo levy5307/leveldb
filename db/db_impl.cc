@@ -323,6 +323,7 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
     }
   }
 
+  /** 从CURRENT中读取到manifest文件，再从manifest文件中恢复version挂到versionset中(同时需要修改current_) */
   s = versions_->Recover(save_manifest);
   if (!s.ok()) {
     return s;
