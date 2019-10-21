@@ -330,6 +330,7 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
   }
   SequenceNumber max_sequence(0);
 
+  /** 恢复所有所有比manifest还要新的log文件 */
   // Recover from all newer log files than the ones named in the
   // descriptor (new log files may have been added by the previous
   // incarnation without registering them in the descriptor).
@@ -339,16 +340,24 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
   // produced by an older version of leveldb.
   const uint64_t min_log = versions_->LogNumber();
   const uint64_t prev_log = versions_->PrevLogNumber();
+  /** 获取dbname_路径下的所有文件 */
   std::vector<std::string> filenames;
   s = env_->GetChildren(dbname_, &filenames);
   if (!s.ok()) {
     return s;
   }
+
+  /** 获取该version set中对应的所有文件 */
   std::set<uint64_t> expected;
   versions_->AddLiveFiles(&expected);
   uint64_t number;
   FileType type;
   std::vector<uint64_t> logs;
+
+  /**
+   * 从filenames中获取所有的log文件
+   * 并令expected files = expected files - filenames
+   **/
   for (size_t i = 0; i < filenames.size(); i++) {
     if (ParseFileName(filenames[i], &number, &type)) {
       expected.erase(number);
@@ -356,6 +365,10 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
         logs.push_back(number);
     }
   }
+
+  /**
+   * expected files - filenames不为空，则说明version set中对应的有些文件在磁盘中被删掉了
+   **/
   if (!expected.empty()) {
     char buf[50];
     snprintf(buf, sizeof(buf), "%d missing files; e.g.",
@@ -364,6 +377,7 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
   }
 
   // Recover in the order in which the logs were generated
+  /** 回放所有的log文件 */
   std::sort(logs.begin(), logs.end());
   for (size_t i = 0; i < logs.size(); i++) {
     s = RecoverLogFile(logs[i], (i == logs.size() - 1), save_manifest, edit,
