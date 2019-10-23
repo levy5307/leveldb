@@ -36,6 +36,7 @@ class WritableFile;
  *      ________________________________________________________________
  *     | checksum(uint32) | length(uint16) | type(uint8) | data(length) |
  *      ----------------------------------------------------------------
+ *     kHeaderSize = sizeof(checksum) + sizeof(length) + sizeof(type)
  *     checksum: type和data的crc校验
  *     length: data的长度
  *     type: 为了避免block内部碎片的产生，一份record可能会跨block，所以根据record内保存数据占更新写入数据的完整与否，

@@ -76,6 +76,20 @@ class LEVELDB_EXPORT WriteBatch {
  private:
   friend class WriteBatchInternal;
 
+  /**
+   * rep_: 由sequence、count和data三部分组成
+   *   sequence: fixed64
+   *   count: fixed32
+   *   data: record[count]
+   *
+   * record: 有两种类型kTypeValue或者kTypeDeletion, 分别如下所示：
+   *   kTypeValue varstring varstring
+   *   kTypeDeletion varstring
+   *
+   * varstring: 由len和data两部分组成
+   *   len: varint32
+   *   data: uint8[len]
+   */
   std::string rep_;  // See comment in write_batch.cc for the format of rep_
 };
 

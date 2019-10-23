@@ -248,7 +248,7 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result) {
     const unsigned int type = header[6];
     const uint32_t length = a | (b << 8);
     /**
-     * data length + header size > buffer_剩余的空间，说明此record有问题:
+     *  data length + header size > buffer_剩余的空间，说明此record有问题:
      *  即使是一个record过长，在一个block放不下，而分成了多个record的话，此时的data length也应该是拆分后的record的实际长度,
      *  因此不可能出现data length + header size > buffer_剩余空间的问题
      * */
