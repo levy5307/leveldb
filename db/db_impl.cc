@@ -289,6 +289,7 @@ void DBImpl::DeleteObsoleteFiles() {
   mutex_.Lock();
 }
 
+/** 最终所有recover的操作记录都在VersionEdit *edit中返回 */
 Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
   mutex_.AssertHeld();
 
@@ -469,6 +470,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
       *max_sequence = last_seq;
     }
 
+    /** memtable的占用内存大小 > write buffer size, 则compact */
     if (mem->ApproximateMemoryUsage() > options_.write_buffer_size) {
       compactions++;
       *save_manifest = true;
@@ -486,6 +488,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
   delete file;
 
   // See if we should keep reusing the last log file.
+  /** 目前reuse log都是false */
   if (status.ok() && options_.reuse_logs && last_log && compactions == 0) {
     assert(logfile_ == nullptr);
     assert(log_ == nullptr);
@@ -507,6 +510,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
     }
   }
 
+  /** 剩余的memtable内容也做compact */
   if (mem != nullptr) {
     // mem did not get reused; compact it.
     if (status.ok()) {
@@ -530,6 +534,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   Log(options_.info_log, "Level-0 table #%llu: started",
       (unsigned long long)meta.number);
 
+  /** 根据memtable构造出sst文件 */
   Status s;
   {
     mutex_.Unlock();
@@ -545,6 +550,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
 
   // Note that if file_size is zero, the file has been deleted and
   // should not be added to the manifest.
+  /** 查找到需要加入到version中的哪一层 */
   int level = 0;
   if (s.ok() && meta.file_size > 0) {
     const Slice min_user_key = meta.smallest.user_key();
