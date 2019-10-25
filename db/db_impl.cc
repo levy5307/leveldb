@@ -706,6 +706,7 @@ void DBImpl::BGWork(void* db) {
 void DBImpl::BackgroundCall() {
   MutexLock l(&mutex_);
   assert(background_compaction_scheduled_);
+  /** shutting_down_代表该DBImpl正在被析构中 */
   if (shutting_down_.load(std::memory_order_acquire)) {
     // No more background work when shutting down.
   } else if (!bg_error_.ok()) {
@@ -718,7 +719,10 @@ void DBImpl::BackgroundCall() {
 
   // Previous compaction may have produced too many files in a level,
   // so reschedule another compaction if needed.
+  /** 执行compaction过程有可能产生一些文件，导致再次需要执行compaction，所以再判断一次 */
   MaybeScheduleCompaction();
+
+  /** 唤醒一波等待 */
   background_work_finished_signal_.SignalAll();
 }
 
@@ -1158,6 +1162,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
   Version::GetStats stats;
 
   // Unlock while reading from files and memtables
+  /** 先从memtable里查找，再从current里查找所有的level文件(先从level 0文件找，找不到再向level 1文件中找) */
   {
     mutex_.Unlock();
     // First look in the memtable, then in the immutable memtable (if any).
@@ -1173,7 +1178,9 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     mutex_.Lock();
   }
 
+  /** updateStats更新seek次数, seek次数多说明当前的lsm-tree结构不好，所以执行compaction */
   if (have_stat_update && current->UpdateStats(stats)) {
+    /** 并判断接下来是否需要compact, 如果需要，则用background线程去执行compaction */
     MaybeScheduleCompaction();
   }
   mem->Unref();

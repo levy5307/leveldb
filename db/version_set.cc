@@ -400,7 +400,7 @@ Status Version::Get(const ReadOptions& options, const LookupKey& k,
     // Get the list of files to search in this level
     FileMetaData* const* files = &files_[level][0];
     if (level == 0) {
-        /** 如果level=0, 由于文件之间有overlap，所以需要查找该层中的所有文件 */
+      /** 如果level=0, 由于文件之间有overlap，所以需要查找该层中的所有文件 */
       // Level-0 files may overlap each other.  Find all files that
       // overlap user_key and process them in order from newest to oldest.
       tmp.reserve(num_files);
