@@ -634,9 +634,8 @@ void Version::GetOverlappingInputs(int level, const InternalKey* begin,
         // Level-0 files may overlap each other.  So check if the newly
         // added file has expanded the range.  If so, restart search.
         /**
-         * 如果是level=0, 则扩大范围(到该文件的start和limit)重新查找,
-         * 因为level 0层文件有overlap，所以如果当前level 0层file与[user_begin, user_limit]有重叠，
-         * 则需要统计与该文件有重叠的所有文件
+         * 如果是level=0, 查看新加入的文件是否扩大了查找范围，
+         * 如果是的话，则则扩大范围(到该文件的start和limit)重新查找
          **/
         if (begin != nullptr && user_cmp->Compare(file_start, user_begin) < 0) {
           user_begin = file_start;
@@ -1469,6 +1468,7 @@ Compaction* VersionSet::PickCompaction() {
 
   // We prefer compactions triggered by too much data in a level over
   // the compactions triggered by seeks.
+  /** 优先选择size compaction */
   const bool size_compaction = (current_->compaction_score_ >= 1);
   const bool seek_compaction = (current_->file_to_compact_ != nullptr);
   if (size_compaction) {
@@ -1701,7 +1701,7 @@ Compaction* VersionSet::CompactRange(int level, const InternalKey* begin,
   // and we must not pick one file and drop another older file if the
   // two files overlap.
   /**
-   * level > 0时，一次执行compaction的范围不要太大。但是level = 0时除外，
+   * 一次执行compaction的范围不要太大。但是level = 0时除外，
    * 因为level = 0的文件有overlap，不可能处理了前面一个，后面一个与前一个有重叠的文件不处理
    **/
   if (level > 0) {

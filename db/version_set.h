@@ -464,8 +464,8 @@ class Compaction {
   /**
    * 位于level_+2，并且与compact的key-range有overlap的sstable。
    * 保存grandparents_是因为compact最终会生成一系列level_+1的sstable，
-   * 而如果生成的sstable与level_+2中有过多的overlap的话，当compact
-   * level_+1时，会产生过多的merge，为了尽量避免这种情况，compact过程中
+   * 而如果生成的sstable与level_+2(grandparents_)中有过多的overlap的话，
+   * 当compact level_+1时，会产生过多的merge，为了尽量避免这种情况，compact过程中
    * 需要检查与level_+2中产生overlap的size并与阈值kMaxGrandParentOverlapBytes做比较，
    * 以便提前中止compact。
    **/

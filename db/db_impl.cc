@@ -760,6 +760,14 @@ void DBImpl::BackgroundCompaction() {
   if (c == nullptr) {
     // Nothing to do
   } else if (!is_manual && c->IsTrivialMove()) {
+    /**
+     * 如果满足一下四点:
+     *   1.如果不是is_manual
+     *   2.level层文件只有一个
+     *   3.level+1层文件数量为0
+     *   4.level+2中overlap文件大小没有超过阈值
+     * 则直接将level层的转移到level+1层
+     **/
     // Move file to next level
     assert(c->num_input_files(0) == 1);
     FileMetaData* f = c->input(0, 0);
@@ -776,6 +784,13 @@ void DBImpl::BackgroundCompaction() {
         static_cast<unsigned long long>(f->file_size),
         status.ToString().c_str(), versions_->LevelSummary(&tmp));
   } else {
+    /**
+     * 满足下述四条之一, 即执行这里：
+     *   1.manual compaction
+     *   2.level层文件数量 > 1
+     *   3.level+1层文件数量 > 0
+     *   4.level+2中overlap文件大小超过阈值
+     * */
     CompactionState* compact = new CompactionState(c);
     status = DoCompactionWork(compact);
     if (!status.ok()) {
