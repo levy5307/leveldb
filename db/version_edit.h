@@ -102,9 +102,12 @@ class VersionEdit {
   typedef std::set<std::pair<int, uint64_t>> DeletedFileSet;
 
   std::string comparator_;
+  /** log文件的file number */
   uint64_t log_number_;
   uint64_t prev_log_number_;
+  /** 下一个可用的 FileNumber */
   uint64_t next_file_number_;
+  /** 最后用过的 SequnceNumber */
   SequenceNumber last_sequence_;
   bool has_comparator_;
   bool has_log_number_;

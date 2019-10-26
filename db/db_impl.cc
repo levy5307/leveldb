@@ -550,14 +550,15 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
 
   // Note that if file_size is zero, the file has been deleted and
   // should not be added to the manifest.
-  /** 查找到需要加入到version中的哪一层 */
   int level = 0;
   if (s.ok() && meta.file_size > 0) {
     const Slice min_user_key = meta.smallest.user_key();
     const Slice max_user_key = meta.largest.user_key();
     if (base != nullptr) {
+      /** 查找到需要加入到version中的哪一层 */
       level = base->PickLevelForMemTableOutput(min_user_key, max_user_key);
     }
+    /** 将生成的sst文件加入该level(并没有真正加入到version中，是用version edit表示) */
     edit->AddFile(level, meta.number, meta.file_size, meta.smallest,
                   meta.largest);
   }
@@ -588,6 +589,7 @@ void DBImpl::CompactMemTable() {
   if (s.ok()) {
     edit.SetPrevLogNumber(0);
     edit.SetLogNumber(logfile_number_);  // Earlier logs no longer needed
+    /** 应用该version edit */
     s = versions_->LogAndApply(&edit, &mutex_);
   }
 
@@ -729,6 +731,7 @@ void DBImpl::BackgroundCall() {
 void DBImpl::BackgroundCompaction() {
   mutex_.AssertHeld();
 
+  /** 先将immutable memtable进行compact */
   if (imm_ != nullptr) {
     CompactMemTable();
     return;
