@@ -56,6 +56,15 @@ class LOCKABLE Mutex {
 
   void Lock() EXCLUSIVE_LOCK_FUNCTION() { mu_.lock(); }
   void Unlock() UNLOCK_FUNCTION() { mu_.unlock(); }
+  /**
+   * As you have observed it does nothing in the default implementation.
+   * The function seems to be a placeholder for checking whether a particular thread holds a mutex and optionally abort if it doesn’t.
+   * This would be equivalent to the normal asserts we use for variables but applied on mutexes.
+   * I think the reason it is not implemented yet is we don’t have an equivalent light weight function to assert whether a thread holds a lock in pthread_mutex_t used in the default implementation.
+   * Some platforms which has that capability could fill this implementation as part of porting process.
+   * Searching online I did find some implementation for this function in the windows port of leveldb.
+   * I can see one way to implement it using a wrapper class over pthread_mutex_t and setting some sort of a thread id variable to indicate which thread(s) currently holds the mutex, but it will have to be carefully implemented given the race conditions that can arise.
+   **/
   void AssertHeld() ASSERT_EXCLUSIVE_LOCK() {}
 
  private:
