@@ -753,6 +753,7 @@ void DBImpl::BackgroundCompaction() {
         (m->end ? m->end->DebugString().c_str() : "(end)"),
         (m->done ? "(end)" : manual_end.DebugString().c_str()));
   } else {
+    /** 获取一个Compaction类型对象(包括level和level+1层文件，grandparents文件等) */
     c = versions_->PickCompaction();
   }
 
@@ -761,7 +762,7 @@ void DBImpl::BackgroundCompaction() {
     // Nothing to do
   } else if (!is_manual && c->IsTrivialMove()) {
     /**
-     * 如果满足一下四点:
+     * 如果满足以下四点:
      *   1.如果不是is_manual
      *   2.level层文件只有一个
      *   3.level+1层文件数量为0
