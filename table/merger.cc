@@ -88,11 +88,7 @@ class MergingIterator : public Iterator {
     // true for all of the non-current_ children since current_ is
     // the smallest child and key() == current_->key().  Otherwise,
     // we explicitly position the non-current_ children.
-    /**
-     * 如果当前direction是kForward，则说明所有的child都指向最小，并且current是所有child中最小的iterator,
-     * 直接令current往前走一步，并在所有child中再找最小;
-     * 否则，令所有child指向比current->key大的iterator，并在所有child中再取最小
-     * */
+    /** 如果方向是kBackward，则说明上次操作方向是kBackward, 这时候current_指向的元素比所有childs都大 */
     if (direction_ != kForward) {
       for (int i = 0; i < n_; i++) {
         IteratorWrapper* child = &children_[i];
@@ -119,6 +115,13 @@ class MergingIterator : public Iterator {
     // true for all of the non-current_ children since current_ is
     // the largest child and key() == current_->key().  Otherwise,
     // we explicitly position the non-current_ children.
+    /**
+     *  因为有多个Iterator存在，需要记录前一次做的是何种方向的操作, 判断这一次操作的方向是否和前一次一致，来做不同的处理。
+     *  比如，如果之前一步做了Next(), 那么direction_就是kForward, current_定位到的一定是children_中满足条件最小的(顺序由小到大)，
+     *  其他的Iterator已经定位到大于当前key的位置(除非Iterator已经end), 这时继续做Next(), 只需要current_->Next()，然后在children_中选出大于当前key且最小的即可.
+     *  但如果做Prev(), 其他的 Iterator可能位于大于当前key的位置，所以必须先让所有的Iterator都定位到小于当前key的位置(Ierator中不存在key，就SeekToLast()),
+     *  然后选出小于当前key且最大的
+     **/
     if (direction_ != kReverse) {
       for (int i = 0; i < n_; i++) {
         IteratorWrapper* child = &children_[i];
@@ -164,6 +167,13 @@ class MergingIterator : public Iterator {
 
  private:
   // Which direction is the iterator moving?
+  /**
+   *  因为有多个Iterator存在，需要记录前一次做的是何种方向的操作, 判断这一次操作的方向是否和前一次一致，来做不同的处理。
+   *  比如，如果做了Next()，current_定位到的一定是children_中满足条件最小的，其他的Iterator已经定位到大于当前key的位置(除非Iterator已经end），
+   *  这时继续做Next(), 只需要current_->Next()，然后在children_中选出大于当前key且最小的即可.
+   *  但如果做Prev(), 其他的 Iterator可能位于大于当前key的位置，所以必须先让所有的Iterator都定位到小于当前key的位置(Ierator中不存在key，就SeekToLast()),
+   *  然后选出小于当前key且最大的
+   **/
   enum Direction { kForward, kReverse };
 
   void FindSmallest();

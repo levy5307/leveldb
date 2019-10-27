@@ -1441,7 +1441,7 @@ Iterator* VersionSet::MakeInputIterator(Compaction* c) {
   int num = 0;
   for (int which = 0; which < 2; which++) {
     if (!c->inputs_[which].empty()) {
-      /** 对于level-0层的文件，每个文件创建一个iterator，则为每一层统一创建一个two level iterator */
+      /** 对于level-0层的文件，每个文件创建一个iterator，否则为每一层统一创建一个two level iterator */
       if (c->level() + which == 0) {
         const std::vector<FileMetaData*>& files = c->inputs_[which];
         for (size_t i = 0; i < files.size(); i++) {
