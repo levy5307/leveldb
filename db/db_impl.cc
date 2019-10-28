@@ -935,6 +935,9 @@ Status DBImpl::InstallCompactionResults(CompactionState* compact) {
   return versions_->LogAndApply(compact->compaction->edit(), &mutex_);
 }
 
+/**
+ * 实际的compact过程就是对多个已经排序的sstable做一次merge排序，丢弃掉相同key以及删除的数据
+ **/
 Status DBImpl::DoCompactionWork(CompactionState* compact) {
   const uint64_t start_micros = env_->NowMicros();
   int64_t imm_micros = 0;  // Micros spent doing imm_ compactions
@@ -978,6 +981,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       imm_micros += (env_->NowMicros() - imm_start);
     }
 
+    /** 判断compact到当前key时，判断其与grandparents是否有过多的overlap, 如果是，则停止继续compaction */
     Slice key = input->key();
     if (compact->compaction->ShouldStopBefore(key) &&
         compact->builder != nullptr) {
@@ -1371,6 +1375,7 @@ WriteBatch* DBImpl::BuildBatchGroup(Writer** last_writer) {
 
 // REQUIRES: mutex_ is held
 // REQUIRES: this thread is currently at the front of the writer queue
+/** force：强制进行memtable compact */
 Status DBImpl::MakeRoomForWrite(bool force) {
   mutex_.AssertHeld();
   assert(!writers_.empty());
@@ -1395,15 +1400,18 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       mutex_.Lock();
     } else if (!force &&
                (mem_->ApproximateMemoryUsage() <= options_.write_buffer_size)) {
+      /** 如果force=true，即使有充足的空间，也还是要进行compaction */
       // There is room in current memtable
       break;
     } else if (imm_ != nullptr) {
+      /** 以下几个else都说明了mem_->ApproximateMemoryUsage() > options_.write_buffer_size 或者 force=true */
       // We have filled up the current memtable, but the previous
       // one is still being compacted, so we wait.
       Log(options_.info_log, "Current memtable full; waiting...\n");
       background_work_finished_signal_.Wait();
     } else if (versions_->NumLevelFiles(0) >= config::kL0_StopWritesTrigger) {
       // There are too many level-0 files.
+      /** level-0层文件过多，所以不能对memtable进行compaction，因为对memtable进行compaction会增加level-0层文件数量 */
       Log(options_.info_log, "Too many L0 files; waiting...\n");
       background_work_finished_signal_.Wait();
     } else {
@@ -1414,6 +1422,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       s = env_->NewWritableFile(LogFileName(dbname_, new_log_number), &lfile);
       if (!s.ok()) {
         // Avoid chewing through file number space in a tight loop.
+        /** 由于打开文件失败了，需要重新设置该new_log_number可用 */
         versions_->ReuseFileNumber(new_log_number);
         break;
       }
@@ -1422,10 +1431,15 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       logfile_ = lfile;
       logfile_number_ = new_log_number;
       log_ = new log::Writer(lfile);
+      /** 将当前memtable复制到immutable memtable, 然后进行background compaction(对immutable memtable和sst table都进行compaction) */
       imm_ = mem_;
       has_imm_.store(true, std::memory_order_release);
       mem_ = new MemTable(internal_comparator_);
       mem_->Ref();
+      /**
+       * 上面的逻辑判断中表示如果force=true，即使有充足的空间，也还是要进行compaction
+       * 这里将force设置为false，表示如果下面有了充足的空间来写入，那么不要强制进行compaction
+       **/
       force = false;  // Do not force another compaction if have room
       MaybeScheduleCompaction();
     }
