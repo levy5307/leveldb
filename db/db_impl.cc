@@ -1407,6 +1407,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       /** 以下几个else都说明了mem_->ApproximateMemoryUsage() > options_.write_buffer_size 或者 force=true */
       // We have filled up the current memtable, but the previous
       // one is still being compacted, so we wait.
+      /** memtable填满了，immutable memtable也存在(正在进行compaction)，只能等待 */
       Log(options_.info_log, "Current memtable full; waiting...\n");
       background_work_finished_signal_.Wait();
     } else if (versions_->NumLevelFiles(0) >= config::kL0_StopWritesTrigger) {
