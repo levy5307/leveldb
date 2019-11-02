@@ -1325,6 +1325,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
 
 // REQUIRES: Writer list must be non-empty
 // REQUIRES: First writer must have a non-null batch
+/** 将writers_队列中所有符合条件的写入操作合并到一起, 并返回 */
 WriteBatch* DBImpl::BuildBatchGroup(Writer** last_writer) {
   mutex_.AssertHeld();
   assert(!writers_.empty());
@@ -1337,6 +1338,7 @@ WriteBatch* DBImpl::BuildBatchGroup(Writer** last_writer) {
   // Allow the group to grow up to a maximum size, but if the
   // original write is small, limit the growth so we do not slow
   // down the small write too much.
+  /** 合并的max size是4M, 但是如果是个small write, 则最大为size+128K(防止该small write等太久) */
   size_t max_size = 1 << 20;
   if (size <= (128 << 10)) {
     max_size = size + (128 << 10);
@@ -1347,6 +1349,7 @@ WriteBatch* DBImpl::BuildBatchGroup(Writer** last_writer) {
   ++iter;  // Advance past "first"
   for (; iter != writers_.end(); ++iter) {
     Writer* w = *iter;
+    /** 如果first允许sync写入，而w不允许，则不将w合并 */
     if (w->sync && !first->sync) {
       // Do not include a sync write into a batch handled by a non-sync write.
       break;
@@ -1360,12 +1363,18 @@ WriteBatch* DBImpl::BuildBatchGroup(Writer** last_writer) {
       }
 
       // Append to *result
+      /**
+       * 这里写的不太好，循环最开始result一定等于firt->batch, 为什么不在循环之前写这一段
+       * 相当于将合并的结果存入到tmp_batch_中，而不是在first->batch中, 为了不污染fist->batch的数据
+       **/
       if (result == first->batch) {
         // Switch to temporary batch instead of disturbing caller's batch
         result = tmp_batch_;
         assert(WriteBatchInternal::Count(result) == 0);
         WriteBatchInternal::Append(result, first->batch);
       }
+
+      /** 合并w->batch到result中 */
       WriteBatchInternal::Append(result, w->batch);
     }
     *last_writer = w;
@@ -1439,7 +1448,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       mem_->Ref();
       /**
        * 上面的逻辑判断中表示如果force=true，即使有充足的空间，也还是要进行compaction
-       * 这里将force设置为false，表示如果下面有了充足的空间来写入，那么不要强制进行compaction
+       * 这里将force设置为false，表示如果下次循环有了充足的空间来写入，则不要强制进行compaction, 直接break后返回了
        **/
       force = false;  // Do not force another compaction if have room
       MaybeScheduleCompaction();
