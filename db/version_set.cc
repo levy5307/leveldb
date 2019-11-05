@@ -399,6 +399,10 @@ Status Version::Get(const ReadOptions& options, const LookupKey& k,
 
     // Get the list of files to search in this level
     FileMetaData* const* files = &files_[level][0];
+    /**
+     * f->largest >= user_key >= f->smallest的所有文件 --> files
+     * 排在前面的文件其文件number越大，代表文件越新
+     **/
     if (level == 0) {
       /** 如果level=0, 由于文件之间有overlap，所以需要查找该层中的所有文件 */
       // Level-0 files may overlap each other.  Find all files that
@@ -446,6 +450,7 @@ Status Version::Get(const ReadOptions& options, const LookupKey& k,
       }
     }
 
+    /** 从上面得到files中查找key，排在前面的越新，所以循环中只要找到了，直接返回; 没找到则去下一层继续找 */
     for (uint32_t i = 0; i < num_files; ++i) {
       if (last_file_read != nullptr && stats->seek_file == nullptr) {
         // We have had more than one seek for this read.  Charge the 1st file.

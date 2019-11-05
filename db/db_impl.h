@@ -36,10 +36,11 @@ class DBImpl : public DB {
   ~DBImpl() override;
 
   // Implementations of the DB interface
+  /** Put和Delete最后调用的还是Write接口 */
   Status Put(const WriteOptions&, const Slice& key,
              const Slice& value) override;
   Status Delete(const WriteOptions&, const Slice& key) override;
-  /** 会尽量将队列中的所有writer合并成批量写入 */
+  /** 会尽量将队列中的更多的writer合并成批量写入 */
   Status Write(const WriteOptions& options, WriteBatch* updates) override;
   Status Get(const ReadOptions& options, const Slice& key,
              std::string* value) override;
