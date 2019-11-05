@@ -185,6 +185,15 @@ class DBImpl : public DB {
   uint32_t seed_ GUARDED_BY(mutex_);  // For sampling.
 
   // Queue of writers.
+  /**
+   * thread 1 -->   ___________________________________________
+   * thread 2 -->  | writer | writer | writer | .... | writer |
+   * thread n -->   -------------------------------------------
+   *
+   * 这里是生产者消费者模型，但是这里特殊的是，生产者在特定情况下就是消费者，
+   * 即：当该thread加入的writer成为队列front时，该thread就变成消费者
+   * 由于一个writer只属于一个thread，所以在同一时刻只有一个消费者。
+   **/
   std::deque<Writer*> writers_ GUARDED_BY(mutex_);
   WriteBatch* tmp_batch_ GUARDED_BY(mutex_);
 

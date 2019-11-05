@@ -1256,13 +1256,14 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
   w.sync = options.sync;
   w.done = false;
 
+  /** 这里需要加锁，因为leveldb支持多线程，为了保护writers_结构，需要一个互斥锁 */
   MutexLock l(&mutex_);
   /** 加入队列尾部 */
   writers_.push_back(&w);
 
   /**
    * 等待w成为了front, 或者w执行完。即等待w前面的writer执行完，或者其自己执行完。
-   * 如果自己执行完了，则直接返回了，否则就继续处理w之后的writer，执行批量写入
+   * 如果自己执行完了，则直接返回了；否则就继续处理w之后的writer，执行批量写入
    **/
   while (!w.done && &w != writers_.front()) {
     w.cv.Wait();
@@ -1276,13 +1277,13 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
   uint64_t last_sequence = versions_->LastSequence();
   Writer* last_writer = &w;
   if (status.ok() && updates != nullptr) {  // nullptr batch is for compactions
-      /**
-       * w  <-- last_writer <-- &last_writer
-       * w2       |
-       * w3       |
-       * w4 <-----
-       * 执行完这里，last_writer指向此次批量写入的最后一个writer
-       **/
+    /**
+     * w  <-- last_writer <-- &last_writer
+     * w2       |
+     * w3       |
+     * w4 <-----
+     * 执行完这里，last_writer指向此次批量写入的最后一个writer
+     **/
     WriteBatch* updates = BuildBatchGroup(&last_writer);
     WriteBatchInternal::SetSequence(updates, last_sequence + 1);
     last_sequence += WriteBatchInternal::Count(updates);
@@ -1294,7 +1295,8 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
     {
       /**
        * 先写入log文件，再写入memtable
-       * 这里可以释放锁, why?
+       * 这里可以释放锁, 也就是写log和写memtable的时候可以对_writers进行写入
+       * 而且由于同时只有一个消费者，这里的写入不用互斥
        **/
       mutex_.Unlock();
       status = log_->AddRecord(WriteBatchInternal::Contents(updates));
