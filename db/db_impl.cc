@@ -1185,7 +1185,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
   Version::GetStats stats;
 
   // Unlock while reading from files and memtables
-  /** 先从memtable里查找，再从current里查找所有的level文件(先从level 0文件找，找不到再向level 1文件中找) */
+  /** 先从memtable里查找，如果没找到，再从current里查找所有的level文件(先从level 0层的文件中找，找不到再向level 1层的文件中找) */
   {
     mutex_.Unlock();
     // First look in the memtable, then in the immutable memtable (if any).
@@ -1250,6 +1250,9 @@ Status DBImpl::Delete(const WriteOptions& options, const Slice& key) {
   return DB::Delete(options, key);
 }
 
+/**
+ * Write操作只负责将这些updates写入到memtable和log文件中, 不负责做compaction
+ **/
 Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
   Writer w(&mutex_);
   w.batch = updates;

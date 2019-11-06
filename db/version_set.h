@@ -101,6 +101,10 @@ class Version {
   // Lookup the value for key.  If found, store it in *val and
   // return OK.  Else return a non-OK status.  Fills *stats.
   // REQUIRES: lock is not held
+  /**
+   * Get接口中, 则填充GetStats, seek_file_level保存查找失败的最高的层的level,
+   * 由于该层之前一直失败，说明该层之前的lsm有问题，所以可能会对其之前的level进行compaction
+   **/
   struct GetStats {
     FileMetaData* seek_file;
     int seek_file_level;
@@ -373,11 +377,22 @@ class VersionSet {
   uint64_t manifest_file_number_;
   /** 最后用过的 SequnceNumber */
   uint64_t last_sequence_;
-  /** log 文件的 FileNumber */
+  /**
+   * log文件的FileNumber:
+   *    leveldb的写流程是先记binlog，然后写sstable，该日志文件即是binlog。前缀数字为FileNumber
+   **/
   uint64_t log_number_;
   uint64_t prev_log_number_;  // 0 or backing store for memtable being compacted
 
   // Opened lazily
+  /**
+   * manifest file: {dbname_}/MANIFEST-{manifest_file_number_}
+   *   为了重启db后可以恢复退出前的状态，需要将db中的状态保存下来，这些状态信息就保存在manifeest 文件中。
+   *   当db出现异常时，为了能够尽可能多的恢复，manifest中不会只保存当前的状态，而是将历史的状态都保存下来。
+   *   又考虑到每次状态的完全保存需要的空间和耗费的时间会较多，
+   *   当前采用的方式是，只在manifest开始保存完整的状态信息（VersionSet::WriteSnapshot（）），接下来只保存每次compact产生的操作（VesrionEdit），
+   *   重启db时，根据开头的起始状态，依次将后续的VersionEdit replay，即可恢复到退出前的状态（Vesrion）。
+   **/
   WritableFile* descriptor_file_;
   log::Writer* descriptor_log_;
   /** version链表的表头（双向循环链表） */

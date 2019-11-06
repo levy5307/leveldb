@@ -392,7 +392,7 @@ Status Version::Get(const ReadOptions& options, const LookupKey& k,
   // in a smaller level, later levels are irrelevant.
   std::vector<FileMetaData*> tmp;
   FileMetaData* tmp2;
-  /** 从第0层开始查找 */
+  /** 从第0层开始查找, 如果找不到则往下一层找 */
   for (int level = 0; level < config::kNumLevels; level++) {
     size_t num_files = files_[level].size();
     if (num_files == 0) continue;
@@ -450,7 +450,7 @@ Status Version::Get(const ReadOptions& options, const LookupKey& k,
       }
     }
 
-    /** 从上面得到files中查找key，排在前面的越新，所以循环中只要找到了，直接返回; 没找到则去下一层继续找 */
+    /** 从上面得到files中查找key。排在前面的文件中的key越新 */
     for (uint32_t i = 0; i < num_files; ++i) {
       if (last_file_read != nullptr && stats->seek_file == nullptr) {
         // We have had more than one seek for this read.  Charge the 1st file.
