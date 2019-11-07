@@ -103,7 +103,7 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
   /** 新的data block */
   if (r->pending_index_entry) {
     assert(r->data_block.empty());
-    /** 找到一个令r->last_key, [r->last_key, key) */
+    /** 找到一个令r->last_key = shortest key in [r->last_key, key) */
     r->options.comparator->FindShortestSeparator(&r->last_key, key);
     std::string handle_encoding;
     r->pending_handle.EncodeTo(&handle_encoding);

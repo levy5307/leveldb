@@ -697,6 +697,7 @@ void DBImpl::MaybeScheduleCompaction() {
     // No work to be done
   } else {
     background_compaction_scheduled_ = true;
+    // start a new thread to run DBImpl::BGWork, using this as parameter
     env_->Schedule(&DBImpl::BGWork, this);
   }
 }

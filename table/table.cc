@@ -63,7 +63,7 @@ namespace leveldb {
  *  3.Meta Index Block:
  *      key: name of meta block i
  *      value: block handle of meta block i
- *    注: 理论上meta index block有多个entry, 针对不同的filter类型，每个filter类型一个entry， 每个entry对应着一个meta block
+ *    注: 理论上meta index block有多个entry, 针对不同的filter类型，每个filter类型一个entry，每个entry对应着一个meta block
  *        所以其实meta block应该也是多个。但是实际上, filter类型只有bloom filter，也就是其实只有一种(即只有一个meta block)
  *
  *  4.Index Block内的每条记录是对某个Data Block建立的索引信息，每条索引信息包括三个内容：
