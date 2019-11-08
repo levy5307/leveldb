@@ -529,6 +529,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   const uint64_t start_micros = env_->NowMicros();
   FileMetaData meta;
   meta.number = versions_->NewFileNumber();
+  /** 加入到pending_outputs防止meta.number文件被删除 */
   pending_outputs_.insert(meta.number);
   Iterator* iter = mem->NewIterator();
   Log(options_.info_log, "Level-0 table #%llu: started",

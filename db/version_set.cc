@@ -575,13 +575,49 @@ bool Version::OverlapInLevel(int level, const Slice* smallest_user_key,
                                smallest_user_key, largest_user_key);
 }
 
+/**
+ * 遍历所有的level, 如果找到某一level，使[smallest, largest]与level和level+1没有overlap,
+ * 且与level+2层overlap小于特定的值，则令level = level + 1; 否则返回level
+ * 举例：假设特定的值是50
+ * 例1：
+ *       level             overlap
+ *      level 0               0
+ *      level 1               1
+ *      level 2               0
+ *      level 3               0
+ * 返回level = 0;
+ *
+ * 例2：
+ *       level             overlap
+ *      level 0               0
+ *      level 1               0
+ *      level 2              100
+ *      level 3               0
+ * 返回level = 0;
+ *
+ * 例3：
+ *       level             overlap
+ *      level 0               0
+ *      level 1               0
+ *      level 2              60
+ *      level 3               0
+ * 返回level = 1;
+ *
+ * 例4：
+ *       level             overlap
+ *      level 0               0
+ *      level 1               0
+ *      level 2               0
+ *      level 3              50
+ * 返回level = 2;
+ **/
 int Version::PickLevelForMemTableOutput(const Slice& smallest_user_key,
                                         const Slice& largest_user_key) {
   int level = 0;
   if (!OverlapInLevel(0, &smallest_user_key, &largest_user_key)) {
     // Push to next level if there is no overlap in next level,
     // and the #bytes overlapping in the level after that are limited.
-    /** 与level 0没有overlap, 则push向下一层 */
+    /** 与level和level+1没有overlap, 并且与level+2层overlap比较小，则push向下一层; 否则返回level */
     InternalKey start(smallest_user_key, kMaxSequenceNumber, kValueTypeForSeek);
     InternalKey limit(largest_user_key, 0, static_cast<ValueType>(0));
     std::vector<FileMetaData*> overlaps;
