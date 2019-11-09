@@ -632,7 +632,7 @@ int Version::PickLevelForMemTableOutput(const Slice& smallest_user_key,
         break;
       }
       if (level + 2 < config::kNumLevels) {
-        /** 查看与祖父层是否有过多的overlap，如果是，则break, 不像level+1层push, 并返回level */
+        /** 查看与祖父层是否有过多的overlap，如果是，则break, 不向level+1层push, 并返回level */
         // Check that file does not overlap too many grandparent bytes.
         GetOverlappingInputs(level + 2, &start, &limit, &overlaps);
         const int64_t sum = TotalFileSize(overlaps);
@@ -965,6 +965,7 @@ void VersionSet::AppendVersion(Version* v) {
   v->next_->prev_ = v;
 }
 
+/** 根据versionedit生成一个version挂到version列表中，并将该versionedit写入description file */
 Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   /** 设置version edit */
   if (edit->has_log_number_) {
@@ -1017,12 +1018,12 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   }
 
   // Unlock during expensive MANIFEST log write
+  /** 将edit写入descriptor file */
   {
     mu->Unlock();
 
     // Write new record to MANIFEST log
     if (s.ok()) {
-      /** 将edit写入descriptor file */
       std::string record;
       edit->EncodeTo(&record);
       s = descriptor_log_->AddRecord(record);
@@ -1048,8 +1049,8 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   }
 
   // Install the new version
+  /** 将v挂到version列表中 */
   if (s.ok()) {
-    /** 将v挂到version列表中 */
     AppendVersion(v);
     log_number_ = edit->log_number_;
     prev_log_number_ = edit->prev_log_number_;

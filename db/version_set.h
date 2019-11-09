@@ -205,6 +205,7 @@ class Version {
   std::vector<FileMetaData*> files_[config::kNumLevels];
 
   // Next file to compact based on seek stats.
+  /** seek compact */
   /** 需要compact的文件(allowed_seeks减少到了0) */
   FileMetaData* file_to_compact_;
   /** file_to_compact_文件的level */
@@ -213,6 +214,7 @@ class Version {
   // Level that should be compacted next and its compaction score.
   // Score < 1 means compaction is not strictly needed.  These fields
   // are initialized by Finalize().
+  /** size compact */
   double compaction_score_;
   int compaction_level_;
 };
@@ -237,7 +239,7 @@ class VersionSet {
 
   /**
    * 以当前Version为基准构造新的Version，VersionSet::Builder将VersionEdit应用在新Version上，
-   * 最后将新Version生效成VersionSet::current_。
+   * 并将该versionedit写入description file, 最后将新Version生效成VersionSet::current_
    **/
   Status LogAndApply(VersionEdit* edit, port::Mutex* mu)
       EXCLUSIVE_LOCKS_REQUIRED(mu);

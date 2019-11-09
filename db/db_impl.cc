@@ -983,7 +983,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       imm_micros += (env_->NowMicros() - imm_start);
     }
 
-    /** 判断compact到当前key时，判断其与grandparents是否有过多的overlap, 如果是，则停止继续compaction */
+    /** 判断compact到当前key时其与grandparents是否有过多的overlap, 如果是，则停止继续compaction */
     Slice key = input->key();
     if (compact->compaction->ShouldStopBefore(key) &&
         compact->builder != nullptr) {
