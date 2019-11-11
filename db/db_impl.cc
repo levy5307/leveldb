@@ -1203,7 +1203,10 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     mutex_.Lock();
   }
 
-  /** updateStats更新seek次数, seek次数多说明当前的lsm-tree结构不好，所以执行compaction */
+  /**
+   * 更新seek compaction（file_to_compaction和file_to_compaction_level）
+   * updateStats更新seek次数, seek次数多说明当前的lsm-tree结构不好，所以执行compaction
+   **/
   if (have_stat_update && current->UpdateStats(stats)) {
     /** 并判断接下来是否需要compact, 如果需要，则用background线程去执行compaction */
     MaybeScheduleCompaction();

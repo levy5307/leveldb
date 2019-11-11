@@ -30,7 +30,7 @@ Status BuildTable(const std::string& dbname, Env* env, const Options& options,
       return s;
     }
 
-    /** 获取最小key（因为key是从小到大排序的）*/
+    /** 获取最小key-->FileMetaData（因为key是从小到大排序的）*/
     TableBuilder* builder = new TableBuilder(options, file);
     meta->smallest.DecodeFrom(iter->key());
 

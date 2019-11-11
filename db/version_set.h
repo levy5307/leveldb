@@ -91,7 +91,7 @@ bool SomeFileOverlapsRange(const InternalKeyComparator& icmp,
                            const Slice* largest_user_key);
 
 /**
- * 管理某个版本的所有sstable, db中可能有多个version存在，他们通过链表链接起来
+ * 管理某个版本的所有sstable(即管理某个版本的lsm-tree), db中可能有多个version存在，他们通过链表链接起来
  * 为每个version加入引用计数，读以及解除读操作会将引用计数相应+1/-1，
  * 当version的引用计数为0并且不是最新的version时，该version将会从链表中摘除，
  * 同时，version内的sstable就可以删除了（这些废弃的sstable会在下一次campact完成时删除）

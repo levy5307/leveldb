@@ -987,7 +987,7 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
     builder.Apply(edit);
     builder.SaveTo(v);
   }
-  /** 计算Version *v的compaction level及其compaction score */
+  /** 计算Version *v的compaction level及其compaction score(size compaction) */
   Finalize(v);
 
   // Initialize new descriptor log file if necessary by creating
