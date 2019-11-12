@@ -494,6 +494,10 @@ Status Version::Get(const ReadOptions& options, const LookupKey& k,
   return Status::NotFound(Slice());  // Use an empty error message for speed
 }
 
+/**
+ * 更新seek compaction信息，在查询的时候执行一次(DBImpl::Get和DBIter::ParseKey时)
+ * 如果返回true, 则说明可以进行seek compaction，否则则代表不可以
+ **/
 bool Version::UpdateStats(const GetStats& stats) {
   FileMetaData* f = stats.seek_file;
   if (f != nullptr) {
@@ -540,6 +544,7 @@ bool Version::RecordReadSample(Slice internal_key) {
 
   State state;
   state.matches = 0;
+  /** 对所有与ikey.user_key有overlap的文件执行State::Match函数, 如果State::Match执行返回了false，则停止轮询 */
   ForEachOverlapping(ikey.user_key, internal_key, &state, &State::Match);
 
   // Must have at least two matches since we want to merge across

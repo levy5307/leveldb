@@ -145,8 +145,8 @@ inline bool DBIter::ParseKey(ParsedInternalKey* ikey) {
   Slice k = iter_->key();
 
   /**
-   * 获取当前iter_所指向的key，如果bytes_untili_read_sampling < bytes_read, 则记录sample,
-   * 并随机增加bytes_until_read_sampling的值
+   * 获取当前iter_所指向的key，如果当前读取的数据(bytes_read) > bytes_until_read_sampling,
+   * 则记录sample, 并随机增加bytes_until_read_sampling的值
    * */
   size_t bytes_read = k.size() + iter_->value().size();
   while (bytes_until_read_sampling_ < bytes_read) {
