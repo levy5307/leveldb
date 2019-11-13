@@ -377,7 +377,7 @@ class VersionSet {
   uint64_t next_file_number_;
   /** manifest文件的FileNumber */
   uint64_t manifest_file_number_;
-  /** 最后用过的 SequnceNumber */
+  /** 最后用过的SequnceNumber */
   uint64_t last_sequence_;
   /**
    * log文件的FileNumber:
@@ -404,6 +404,7 @@ class VersionSet {
 
   // Per-level key at which the next compaction at that level should start.
   // Either an empty string, or a valid InternalKey.
+  /** 在SetupOtherInputs函数中，当获取inputs[0]和inputs[1]中所有文件时，同时计算comaction开始节点，保存到compaction_pointer_中 */
   std::string compact_pointer_[config::kNumLevels];
 };
 
