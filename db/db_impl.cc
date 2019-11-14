@@ -870,6 +870,7 @@ Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
   return s;
 }
 
+/** 统计本次compaction的相关数据，并将compaction outputfile保存, 最后试用该文件是否可用 */
 Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
                                           Iterator* input) {
   assert(compact != nullptr);
@@ -983,7 +984,10 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       imm_micros += (env_->NowMicros() - imm_start);
     }
 
-    /** 判断compact到当前key时其与grandparents是否有过多的overlap, 如果是，则停止继续compaction */
+    /**
+     * 判断compact到当前key时其与grandparents是否有过多的overlap, 如果是，则停止继续compaction
+     * note: ShouldStopBefore这个函数是有状态的(seen_key_这个变量的设置与逻辑判断)，感觉不是特别好
+     **/
     Slice key = input->key();
     if (compact->compaction->ShouldStopBefore(key) &&
         compact->builder != nullptr) {

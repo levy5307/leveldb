@@ -377,7 +377,7 @@ class VersionSet {
   uint64_t next_file_number_;
   /** manifest文件的FileNumber */
   uint64_t manifest_file_number_;
-  /** 最后用过的SequnceNumber */
+  /** 已经写入leveldb(ldb文件)中的最大SequnceNumber */
   uint64_t last_sequence_;
   /**
    * log文件的FileNumber:
