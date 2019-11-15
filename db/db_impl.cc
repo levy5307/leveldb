@@ -954,8 +954,10 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   assert(compact->builder == nullptr);
   assert(compact->outfile == nullptr);
   if (snapshots_.empty()) {
+    /** 如果没有快照，则重复的旧kv数据都可以删掉 */
     compact->smallest_snapshot = versions_->LastSequence();
   } else {
+    /** 如果有快照，则只有sequenceNumber小于最老的快照的sequenceNumber的kv数据才删除 */
     compact->smallest_snapshot = snapshots_.oldest()->sequence_number();
   }
 
@@ -985,7 +987,8 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     }
 
     /**
-     * 判断compact到当前key时其与grandparents是否有过多的overlap, 如果是，则停止继续compaction
+     * 检查当前输出文件是否与level+2层文件有过多冲突，如果是就要完成当前输出文件并产生新的输出文件
+     * 这里并不是停止compaction
      * note: ShouldStopBefore这个函数是有状态的(seen_key_这个变量的设置与逻辑判断)，感觉不是特别好
      **/
     Slice key = input->key();
@@ -1005,12 +1008,18 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       has_current_user_key = false;
       last_sequence_for_key = kMaxSequenceNumber;
     } else {
+        /**
+         * has_current_user_key=false，表明current_user_key中没有保存有效值；说明ikey是遍历的第一个key
+         * ikey.user_key != current_user_key，表明ikey是头一次遇见
+         * 这两者条件都说明是该ikey第一次遇见
+         **/
       if (!has_current_user_key ||
           user_comparator()->Compare(ikey.user_key, Slice(current_user_key)) !=
               0) {
         // First occurrence of this user key
         current_user_key.assign(ikey.user_key.data(), ikey.user_key.size());
         has_current_user_key = true;
+          /** 第一次出现的key不允许删除，所以这里设置为最大值 */
         last_sequence_for_key = kMaxSequenceNumber;
       }
 
