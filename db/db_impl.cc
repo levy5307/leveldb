@@ -904,6 +904,7 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
   delete compact->outfile;
   compact->outfile = nullptr;
 
+  /** 尝试该文件是否可打开 */
   if (s.ok() && current_entries > 0) {
     // Verify that the table is usable
     Iterator* iter =
@@ -961,6 +962,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     compact->smallest_snapshot = snapshots_.oldest()->sequence_number();
   }
 
+  /** 通过input按key的大小顺序获取每个kv对，最先获取的数据是最新的 */
   Iterator* input = versions_->MakeInputIterator(compact->compaction);
 
   // Release mutex while we're actually doing the compaction work
@@ -1009,8 +1011,8 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       last_sequence_for_key = kMaxSequenceNumber;
     } else {
         /**
-         * has_current_user_key=false，表明current_user_key中没有保存有效值；说明ikey是遍历的第一个key
-         * ikey.user_key != current_user_key，表明ikey是头一次遇见
+         * has_current_user_key=false，表明current_user_key中没有保存有效值, 说明ikey是遍历的第一个key;
+         * ikey.user_key != current_user_key，表明ikey是头一次遇见;
          * 这两者条件都说明是该ikey第一次遇见
          **/
       if (!has_current_user_key ||
@@ -1024,11 +1026,21 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       }
 
       if (last_sequence_for_key <= compact->smallest_snapshot) {
+        /** 该key肯定不是第一次出现(第一次出现的key其sequence=kMaxSequenceNumber)，所以可以删除 */
         // Hidden by an newer entry for same user key
         drop = true;  // (A)
       } else if (ikey.type == kTypeDeletion &&
                  ikey.sequence <= compact->smallest_snapshot &&
                  compact->compaction->IsBaseLevelForKey(ikey.user_key)) {
+          /**
+           * 对kTypeDeletion类型的特殊处理
+           * 1.last_sequence_for_key > compact->smallest_snapshot && ikey.sequence <= compact->smallest_snapshot:
+           *    ikey.sequence肯定和last_sequence不相等, 也就是当前key是第一次出现
+           * 2.ikey.type == kTypeDeletion: 说明当前key是删除操作
+           * 3.compact->compaction->IsBaseLevelForKey(ikey.user_key): 说明当前key没在parent及以上的层中出现, 即没有比他还老的key了
+           *
+           * 所以当前删除key基本是无用的，可以drop
+           **/
         // For this user key:
         // (1) there is no data in higher levels
         // (2) data in lower levels will have larger sequence numbers
@@ -1051,6 +1063,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         (int)last_sequence_for_key, (int)compact->smallest_snapshot);
 #endif
 
+    /** 非drop则写入(如果output file没有打开，则打开文件) */
     if (!drop) {
       // Open output file if necessary
       if (compact->builder == nullptr) {
@@ -1075,9 +1088,13 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       }
     }
 
+    /** 处理下一个kv */
     input->Next();
   }
 
+  /**
+   * 接下来是一些统计工作
+   **/
   if (status.ok() && shutting_down_.load(std::memory_order_acquire)) {
     status = Status::IOError("Deleting DB during compaction");
   }
