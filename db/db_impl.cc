@@ -298,7 +298,11 @@ void DBImpl::DeleteObsoleteFiles() {
   mutex_.Lock();
 }
 
-/** 最终所有recover的操作记录都在VersionEdit *edit中返回 */
+/**
+ * 最终所有recover的操作记录都在VersionEdit *edit中返回:
+ *   1.先恢复manifest file中的内容（记录了versionset的数据及其变化: 初始version和各变化version edit）
+ *   2.再恢复各个log文件
+ **/
 Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
   mutex_.AssertHeld();
 
@@ -366,7 +370,6 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
 
   /**
    * 从filenames中获取所有的log文件
-   * 并令expected files = expected files - filenames
    **/
   for (size_t i = 0; i < filenames.size(); i++) {
     if (ParseFileName(filenames[i], &number, &type)) {
@@ -456,6 +459,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
   WriteBatch batch;
   int compactions = 0;
   MemTable* mem = nullptr;
+  /** 从log file中读取数据，写入memtable中 */
   while (reader.ReadRecord(&record, &scratch) && status.ok()) {
     if (record.size() < 12) {
       reporter.Corruption(record.size(),
@@ -464,6 +468,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
     }
     WriteBatchInternal::SetContents(&batch, record);
 
+    /** 如果mem指向空（非成员mem_），则创建一个 */
     if (mem == nullptr) {
       mem = new MemTable(internal_comparator_);
       mem->Ref();
@@ -479,7 +484,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
       *max_sequence = last_seq;
     }
 
-    /** memtable的占用内存大小 > write buffer size, 则compact */
+    /** memtable的占用内存大小 > write buffer size, 则根据memtable生成level 0层的ldb文件插入到lsm-tree中 */
     if (mem->ApproximateMemoryUsage() > options_.write_buffer_size) {
       compactions++;
       *save_manifest = true;
@@ -519,7 +524,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
     }
   }
 
-  /** 剩余的memtable内容也做compact */
+  /** 剩余的memtable内容也写入lsm-tree */
   if (mem != nullptr) {
     // mem did not get reused; compact it.
     if (status.ok()) {
@@ -538,13 +543,13 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   const uint64_t start_micros = env_->NowMicros();
   FileMetaData meta;
   meta.number = versions_->NewFileNumber();
-  /** 加入到pending_outputs防止meta.number文件被删除 */
+  /** 将new file number加入到pending_outputs防止meta.number文件被删除 */
   pending_outputs_.insert(meta.number);
   Iterator* iter = mem->NewIterator();
   Log(options_.info_log, "Level-0 table #%llu: started",
       (unsigned long long)meta.number);
 
-  /** 根据memtable构造出sst文件 */
+  /** 根据memtable构造出ldb文件 */
   Status s;
   {
     mutex_.Unlock();

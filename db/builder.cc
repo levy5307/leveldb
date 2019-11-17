@@ -34,7 +34,7 @@ Status BuildTable(const std::string& dbname, Env* env, const Options& options,
     TableBuilder* builder = new TableBuilder(options, file);
     meta->smallest.DecodeFrom(iter->key());
 
-    /** 将key-value对写入, 如果达到一整个data block则刷新到sst文件中 */
+    /** 将key-value对写入, 如果达到一整个data block则刷新到ldb文件中 */
     for (; iter->Valid(); iter->Next()) {
       Slice key = iter->key();
       meta->largest.DecodeFrom(key);

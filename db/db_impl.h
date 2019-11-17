@@ -179,6 +179,7 @@ class DBImpl : public DB {
   port::Mutex mutex_;
   std::atomic<bool> shutting_down_;
   port::CondVar background_work_finished_signal_ GUARDED_BY(mutex_);
+  /** memtable, 其内部结构是skiplist */
   MemTable* mem_;
   /** immutable memtable */
   MemTable* imm_ GUARDED_BY(mutex_);  // Memtable being compacted
