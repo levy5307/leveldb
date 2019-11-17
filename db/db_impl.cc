@@ -585,6 +585,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   return s;
 }
 
+/** 将imm写入到level 0中 */
 void DBImpl::CompactMemTable() {
   mutex_.AssertHeld();
   assert(imm_ != nullptr);
@@ -603,6 +604,12 @@ void DBImpl::CompactMemTable() {
   // Replace immutable memtable with the generated Table
   if (s.ok()) {
     edit.SetPrevLogNumber(0);
+    /**
+     * 将当前log file number设置到version edit中，用于删除当前所有的log文件:
+     *    设置version edit的log file number, 在apply该version edit时会设置versions_的log file number
+     *    后面在调用DeleteObsoleteFilies时，会比较所有log file的number与versions_->log_number_,
+     *    比versions_->log_number_小的log文件(代表是无用的log文件)会被删除
+     **/
     edit.SetLogNumber(logfile_number_);  // Earlier logs no longer needed
     /** 应用该version edit */
     s = versions_->LogAndApply(&edit, &mutex_);
@@ -1505,6 +1512,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
     } else {
       // Attempt to switch to a new memtable and trigger compaction of old
       assert(versions_->PrevLogNumber() == 0);
+      /** switch到一个新的memtable中，同时log file也换新的 */
       uint64_t new_log_number = versions_->NewFileNumber();
       WritableFile* lfile = nullptr;
       s = env_->NewWritableFile(LogFileName(dbname_, new_log_number), &lfile);
@@ -1634,14 +1642,17 @@ DB::~DB() = default;
 Status DB::Open(const Options& options, const std::string& dbname, DB** dbptr) {
   *dbptr = nullptr;
 
+  /** 创建一个DBImpl类型对象 */
   DBImpl* impl = new DBImpl(options, dbname);
   impl->mutex_.Lock();
   VersionEdit edit;
   // Recover handles create_if_missing, error_if_exists
   bool save_manifest = false;
+  /** impl数据从descriptor文件和log文件中恢复, 将恢复的数据保存到version edit中 */
   Status s = impl->Recover(&edit, &save_manifest);
   if (s.ok() && impl->mem_ == nullptr) {
     // Create new log and a corresponding memtable.
+    /** 创建一个新的log文件和memtable */
     uint64_t new_log_number = impl->versions_->NewFileNumber();
     WritableFile* lfile;
     s = options.env->NewWritableFile(LogFileName(dbname, new_log_number),
@@ -1658,9 +1669,11 @@ Status DB::Open(const Options& options, const std::string& dbname, DB** dbptr) {
   if (s.ok() && save_manifest) {
     edit.SetPrevLogNumber(0);  // No older logs needed after recovery.
     edit.SetLogNumber(impl->logfile_number_);
+    /** apply该version edit */
     s = impl->versions_->LogAndApply(&edit, &impl->mutex_);
   }
   if (s.ok()) {
+    /** 删除无用文件，并且如果可以进行compaction，则做一次compaction */
     impl->DeleteObsoleteFiles();
     impl->MaybeScheduleCompaction();
   }
@@ -1678,6 +1691,7 @@ Snapshot::~Snapshot() = default;
 
 Status DestroyDB(const std::string& dbname, const Options& options) {
   Env* env = options.env;
+  /** 获取该db的所有文件 */
   std::vector<std::string> filenames;
   Status result = env->GetChildren(dbname, &filenames);
   if (!result.ok()) {
@@ -1685,12 +1699,14 @@ Status DestroyDB(const std::string& dbname, const Options& options) {
     return Status::OK();
   }
 
+  /** 使用lock file加锁 */
   FileLock* lock;
   const std::string lockname = LockFileName(dbname);
   result = env->LockFile(lockname, &lock);
   if (result.ok()) {
     uint64_t number;
     FileType type;
+    /** 删除出lock file之外的所有文件 */
     for (size_t i = 0; i < filenames.size(); i++) {
       if (ParseFileName(filenames[i], &number, &type) &&
           type != kDBLockFile) {  // Lock file will be deleted at end
@@ -1701,6 +1717,7 @@ Status DestroyDB(const std::string& dbname, const Options& options) {
       }
     }
     env->UnlockFile(lock);  // Ignore error since state is already gone
+    /** 删除lock file和该db的路径 */
     env->DeleteFile(lockname);
     env->DeleteDir(dbname);  // Ignore error in case dir contains other files
   }

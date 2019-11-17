@@ -1002,7 +1002,7 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
    * 只有在第一次调用该函数时才会执行到这里（即打开该db时），所以也不用加互斥锁
    *
    * 这里的代码也表明，对于descriptor log，先写入一个version(WriteSnapshot),
-   * 然后保存每次compact产生的version edit(s = descriptor_log_->AddRecord(record);)
+   * 然后保存每次compact产生的version edit(s = descriptor_log_->AddRecord(record); 每个version edit作为一个record)
    * 正如version_set.h文件开始处注释中关于manifest file的描述
    **/
   std::string new_manifest_file;
@@ -1017,13 +1017,13 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
     s = env_->NewWritableFile(new_manifest_file, &descriptor_file_);
     if (s.ok()) {
       descriptor_log_ = new log::Writer(descriptor_file_);
-      /** 将当前version写入descriptor log */
+      /** 将当前version写入descriptor log(当前version也是作为一个log) */
       s = WriteSnapshot(descriptor_log_);
     }
   }
 
   // Unlock during expensive MANIFEST log write
-  /** 将edit写入descriptor file */
+  /** 将edit写入descriptor file(edit作为一个record写入) */
   {
     mu->Unlock();
 
@@ -1303,7 +1303,7 @@ void VersionSet::Finalize(Version* v) {
   v->compaction_score_ = best_score;
 }
 
-/** 将当前version写入log, 先将当前version保存成version_edit，然后将version_edit写入log */
+/** 将当前version写入descriptor log, 先将当前version保存成version_edit，然后将version_edit写入log */
 Status VersionSet::WriteSnapshot(log::Writer* log) {
   // TODO: Break up into multiple records to reduce memory usage on recovery?
 

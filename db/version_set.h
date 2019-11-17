@@ -240,6 +240,7 @@ class VersionSet {
   /**
    * 以当前Version为基准构造新的Version，VersionSet::Builder将VersionEdit应用在新Version上，
    * 并将该versionedit写入description file, 最后将新Version生效成VersionSet::current_
+   * 函数名中的log代表计入description file中
    **/
   Status LogAndApply(VersionEdit* edit, port::Mutex* mu)
       EXCLUSIVE_LOCKS_REQUIRED(mu);

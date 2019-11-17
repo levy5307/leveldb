@@ -181,9 +181,10 @@ class DBImpl : public DB {
   port::CondVar background_work_finished_signal_ GUARDED_BY(mutex_);
   /** memtable, 其内部结构是skiplist */
   MemTable* mem_;
-  /** immutable memtable */
+  /** immutable memtable, 当mem_满了的时候将会切换成imm_，并创建一个新的memtable赋值给mem_ */
   MemTable* imm_ GUARDED_BY(mutex_);  // Memtable being compacted
   std::atomic<bool> has_imm_;         // So bg thread can detect non-null imm_
+  /** log文件和memtable是一一对应的，当切换memtable的时候也同时需要创建一个新的log文件 */
   WritableFile* logfile_;
   uint64_t logfile_number_ GUARDED_BY(mutex_);
   log::Writer* log_;
