@@ -1117,13 +1117,14 @@ Status VersionSet::Recover(bool* save_manifest) {
   Builder builder(this, current_);
 
   {
+    /** descriptor file reader */
     LogReporter reporter;
     reporter.status = &s;
     log::Reader reader(file, &reporter, true /*checksum*/,
                        0 /*initial_offset*/);
     Slice record;
     std::string scratch;
-    /** 读取record */
+    /** 从descriptor问加你中读取record */
     while (reader.ReadRecord(&record, &scratch) && s.ok()) {
       /** 将record解析成version edit */
       VersionEdit edit;
@@ -1184,11 +1185,13 @@ Status VersionSet::Recover(bool* save_manifest) {
   }
 
   if (s.ok()) {
-    /** 根据builder生成新的version，计算其compaction level及其compaction score, 并插入到version列表中 */
+    /** 根据builder生成新的version */
     Version* v = new Version(this);
     builder.SaveTo(v);
     // Install recovered version
+    /** 计算其compaction level及其compaction score */
     Finalize(v);
+    /** 插入到version列表中 */
     AppendVersion(v);
     manifest_file_number_ = next_file;
     next_file_number_ = next_file + 1;

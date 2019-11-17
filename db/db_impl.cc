@@ -183,10 +183,16 @@ DBImpl::~DBImpl() {
 Status DBImpl::NewDB() {
   VersionEdit new_db;
   new_db.SetComparatorName(user_comparator()->Name());
+  /**
+   * log file number = 0
+   * descriptor(manifest) file number = 1
+   * next file number = 2
+   **/
   new_db.SetLogNumber(0);
   new_db.SetNextFile(2);
   new_db.SetLastSequence(0);
 
+  /** 创建manifest文件，并将当前db数据写入到manifest文件中 */
   const std::string manifest = DescriptorFileName(dbname_, 1);
   WritableFile* file;
   Status s = env_->NewWritableFile(manifest, &file);
@@ -203,6 +209,8 @@ Status DBImpl::NewDB() {
     }
   }
   delete file;
+
+  /** 创建CURRENT文件，并将manifest文件名字写入CURRENT文件中 */
   if (s.ok()) {
     // Make "CURRENT" file that points to the new manifest file.
     s = SetCurrentFile(env_, dbname_, 1);
@@ -221,6 +229,7 @@ void DBImpl::MaybeIgnoreError(Status* s) const {
   }
 }
 
+/** 删除无用文件 */
 void DBImpl::DeleteObsoleteFiles() {
   mutex_.AssertHeld();
 
@@ -324,7 +333,7 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
     }
   }
 
-  /** 从CURRENT中读取到manifest文件，再从manifest文件中恢复version挂到versionset中(同时需要修改current_) */
+  /** 从CURRENT中读取到manifest文件，再从manifest文件中恢复version挂到versionset中 */
   s = versions_->Recover(save_manifest);
   if (!s.ok()) {
     return s;
@@ -850,6 +859,7 @@ Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
   assert(compact->builder == nullptr);
   uint64_t file_number;
   {
+    /** 创建一个output并放入到compact->outputs中 */
     mutex_.Lock();
     file_number = versions_->NewFileNumber();
     pending_outputs_.insert(file_number);
@@ -862,9 +872,11 @@ Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
   }
 
   // Make the output file
+  /** 为新创建的output创建一个ldb文件 */
   std::string fname = TableFileName(dbname_, file_number);
   Status s = env_->NewWritableFile(fname, &compact->outfile);
   if (s.ok()) {
+    /** 根据ldb文件创建一个table builder */
     compact->builder = new TableBuilder(options_, compact->outfile);
   }
   return s;
@@ -921,6 +933,7 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
   return s;
 }
 
+/** 生成一个versionedit(删除被合并文件，添加outputs文件)，并apply到versionset中 */
 Status DBImpl::InstallCompactionResults(CompactionState* compact) {
   mutex_.AssertHeld();
   Log(options_.info_log, "Compacted %d@%d + %d@%d files => %lld bytes",
@@ -1121,6 +1134,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   mutex_.Lock();
   stats_[compact->compaction->level() + 1].Add(stats);
 
+  /** 生成一个versionedit(删除被合并文件，添加outputs文件)，并apply到versionset中 */
   if (status.ok()) {
     status = InstallCompactionResults(compact);
   }

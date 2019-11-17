@@ -148,8 +148,11 @@ class DBImpl : public DB {
   Status DoCompactionWork(CompactionState* compact)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
+  /** 创建一个output并打开该output对应的文件 */
   Status OpenCompactionOutputFile(CompactionState* compact);
+  /** 完成向当前compact output文件的输出，将当前output对应的文件保存并关闭 */
   Status FinishCompactionOutputFile(CompactionState* compact, Iterator* input);
+  /** 生成一个versionedit(删除被合并文件，添加outputs文件)，并apply到versionset中 */
   Status InstallCompactionResults(CompactionState* compact)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
