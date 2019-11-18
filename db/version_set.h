@@ -372,6 +372,7 @@ class VersionSet {
   Env* const env_;
   const std::string dbname_;
   const Options* const options_;
+  /** key-file number, value-handle of table and file */
   TableCache* const table_cache_;
   const InternalKeyComparator icmp_;
   /** 下一个可用的FileNumber */

@@ -256,6 +256,7 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
       EncodeFixed64(cache_key_buffer, table->rep_->cache_id);
       EncodeFixed64(cache_key_buffer + 8, handle.offset());
       Slice key(cache_key_buffer, sizeof(cache_key_buffer));
+      /** key=cache_id+handle offset; cache_id指定了具体的某一个table，handle offset指定了是哪一个data block */
       cache_handle = block_cache->Lookup(key);
       if (cache_handle != nullptr) {
         /** 从cache中找到了 */

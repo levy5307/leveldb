@@ -92,6 +92,10 @@ struct LEVELDB_EXPORT Options {
 
   // If non-null, use the specified cache for blocks.
   // If null, leveldb will automatically create and use an 8MB internal cache.
+  /**
+   * block_cache集中管理, 这样便于控制大小
+   * key=cache_id+handle offset; cache_id指定了具体的某一个table，handle offset指定了是哪一个data block
+   **/
   Cache* block_cache = nullptr;
 
   // Approximate size of user data packed per block.  Note that the

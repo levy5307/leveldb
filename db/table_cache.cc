@@ -99,7 +99,7 @@ Iterator* TableCache::NewIterator(const ReadOptions& options,
   }
 
   Cache::Handle* handle = nullptr;
-  /** 查找key=file_number的文件的file/handle --> handle */
+  /** 查找key=file_number的文件的file和handle --> handle */
   Status s = FindTable(file_number, file_size, &handle);
   if (!s.ok()) {
     return NewErrorIterator(s);
