@@ -1248,11 +1248,14 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     mutex_.Unlock();
     // First look in the memtable, then in the immutable memtable (if any).
     LookupKey lkey(key, snapshot);
+    /** 先memtable */
     if (mem->Get(lkey, value, &s)) {
       // Done
+    /** 然后immutable memtable */
     } else if (imm != nullptr && imm->Get(lkey, value, &s)) {
       // Done
     } else {
+      /** lsm中去找 */
       s = current->Get(options, lkey, value, &stats);
       have_stat_update = true;
     }

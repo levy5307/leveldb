@@ -55,6 +55,7 @@ class TableCache {
   Env* const env_;
   const std::string dbname_;
   const Options& options_;
+  /** key-filenumber, value-TableAndFile */
   Cache* cache_;
 };
 

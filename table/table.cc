@@ -311,7 +311,7 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k, void* arg,
 
   /** 从index block中找到对应的data block */
   Iterator* iiter = rep_->index_block->NewIterator(rep_->options.comparator);
-  iiter->Seek(k);   // 根据key找到对应的pair(key: key, value: block handle of data clock)
+  iiter->Seek(k);   // 根据key找到对应的pair(key: key, value: block handle of data block)
   /** 该data block必须有效 */
   if (iiter->Valid()) {
     /** block handle of data block */
