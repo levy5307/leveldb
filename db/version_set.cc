@@ -515,6 +515,11 @@ bool Version::UpdateStats(const GetStats& stats) {
   return false;
 }
 
+/** 
+ * 随机采样:
+ *   iteration时随机抽样出来的key如果跨越了2个及以上的level,
+ *   位于最上层level的那个SSTable的allowed_seeks计数器要减一, 当其归零时触发compaction
+ **/
 bool Version::RecordReadSample(Slice internal_key) {
   ParsedInternalKey ikey;
   if (!ParseInternalKey(internal_key, &ikey)) {

@@ -151,6 +151,9 @@ inline bool DBIter::ParseKey(ParsedInternalKey* ikey) {
   size_t bytes_read = k.size() + iter_->value().size();
   while (bytes_until_read_sampling_ < bytes_read) {
     bytes_until_read_sampling_ += RandomCompactionPeriod();
+    /** 
+     * 随机采样
+     **/
     db_->RecordReadSample(k);
   }
 
