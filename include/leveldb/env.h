@@ -303,6 +303,10 @@ LEVELDB_EXPORT Status ReadFileToString(Env* env, const std::string& fname,
 // An implementation of Env that forwards all calls to another Env.
 // May be useful to clients who wish to override just part of the
 // functionality of another Env.
+/**
+ * 这里的wrapper类似于proxy模式，将一切请求都转发给具体的env实现,
+ * 如果有其他类想覆盖wrapper的部分实现，可以继承覆盖相应的成员函数。
+ **/
 class LEVELDB_EXPORT EnvWrapper : public Env {
  public:
   // Initialize an EnvWrapper that delegates all calls to *t.

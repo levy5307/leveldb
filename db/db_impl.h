@@ -195,7 +195,10 @@ class DBImpl : public DB {
    * thread 1 -->   ___________________________________________
    * thread 2 -->  | writer | writer | writer | .... | writer |
    * thread n -->   -------------------------------------------
-   *
+   *                ^                                         ^
+   *                |                                         |
+   *                |                                         |
+   *              tail                                      front
    * 这里是生产者消费者模型，但是这里特殊的是，生产者在特定情况下就是消费者，
    * 即：当该thread加入的writer成为队列front时，该thread就变成消费者
    * 由于一个writer只属于一个thread，所以在同一时刻只有一个消费者。

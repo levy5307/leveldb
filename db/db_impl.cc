@@ -1316,6 +1316,7 @@ Status DBImpl::Delete(const WriteOptions& options, const Slice& key) {
 
 /**
  * Write操作只负责将这些updates写入到memtable和log文件中, 不负责做compaction
+ * Note: 写入被优化成了batch写入
  **/
 Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
   Writer w(&mutex_);
@@ -1329,8 +1330,8 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
   writers_.push_back(&w);
 
   /**
-   * 等待w成为了front, 或者w执行完。即等待w前面的writer执行完，或者其自己执行完。
-   * 如果自己执行完了，则直接返回了；否则就继续处理w之后的writer，执行批量写入
+   * 等待w成为了front, 或者w执行完(由之前的批量写入给执行完了)。如果自己执行完了，则直接返回了；
+   * 否则就继续处理w之后的writer，执行批量写入，将w之后的部分writer一起写入
    **/
   while (!w.done && &w != writers_.front()) {
     w.cv.Wait();
@@ -1387,6 +1388,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
     }
     if (updates == tmp_batch_) tmp_batch_->Clear();
 
+    /** 小细节tips：写完log和memtable才更改versions_中的last_sequence */
     versions_->SetLastSequence(last_sequence);
   }
 
@@ -1453,7 +1455,7 @@ WriteBatch* DBImpl::BuildBatchGroup(Writer** last_writer) {
       // Append to *result
       /**
        * 这里写的不太好，循环最开始result一定等于firt->batch, 为什么不在循环之前写这一段
-       * 相当于将合并的结果存入到tmp_batch_中，而不是在first->batch中, 为了不污染fist->batch的数据
+       * 这里将合并的结果存入到tmp_batch_中，而不是在first->batch中, 这样做是为了不污染fist->batch的数据
        **/
       if (result == first->batch) {
         // Switch to temporary batch instead of disturbing caller's batch
@@ -1465,6 +1467,8 @@ WriteBatch* DBImpl::BuildBatchGroup(Writer** last_writer) {
       /** 合并w->batch到result中 */
       WriteBatchInternal::Append(result, w->batch);
     }
+
+    /** 移动last_writer */
     *last_writer = w;
   }
   return result;
@@ -1493,11 +1497,15 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       // case it is sharing the same core as the writer.
       mutex_.Unlock();
       env_->SleepForMicroseconds(1000);
+      /** 对于一次写入，最多只delay一次 **/
       allow_delay = false;  // Do not delay a single write more than once
       mutex_.Lock();
     } else if (!force &&
                (mem_->ApproximateMemoryUsage() <= options_.write_buffer_size)) {
-      /** 如果force=true，即使有充足的空间，也还是要进行compaction */
+      /**
+       * 有充足空间，则直接break, 返回
+       * 如果force=true，即使有充足的空间，也还是要进行compaction
+       **/
       // There is room in current memtable
       break;
     } else if (imm_ != nullptr) {
@@ -1538,6 +1546,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       /**
        * 上面的逻辑判断中表示如果force=true，即使有充足的空间，也还是要进行compaction
        * 这里将force设置为false，表示如果下次循环有了充足的空间来写入，则不要强制进行compaction, 直接break后返回了
+       * 要不然的话，false一直是true, 则一直执行compaction了
        **/
       force = false;  // Do not force another compaction if have room
       MaybeScheduleCompaction();
@@ -1709,7 +1718,7 @@ Status DestroyDB(const std::string& dbname, const Options& options) {
   if (result.ok()) {
     uint64_t number;
     FileType type;
-    /** 删除出lock file之外的所有文件 */
+    /** 删除除lock file之外的所有文件 */
     for (size_t i = 0; i < filenames.size(); i++) {
       if (ParseFileName(filenames[i], &number, &type) &&
           type != kDBLockFile) {  // Lock file will be deleted at end
