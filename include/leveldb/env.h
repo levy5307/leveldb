@@ -306,6 +306,22 @@ LEVELDB_EXPORT Status ReadFileToString(Env* env, const std::string& fname,
 /**
  * 这里的wrapper类似于proxy模式，将一切请求都转发给具体的env实现,
  * 如果有其他类想覆盖wrapper的部分实现，可以继承覆盖相应的成员函数。
+ *
+ *                   Env
+ *                    ^
+ *                    |
+ *                    |
+ *                EnvWrapper
+ *                  ^ ^ ^
+ *                  | | |
+ *       +----------+ | +------+-------+
+ *       |          |          |       |
+ *       |          |          |       |
+ *   ErrorEnv  InMemoryEnv    ...   SpecialEnv
+ *
+ * 这样实现的好处是，每个EnvWrapper的子类里都可以塞一个其他的子类的对象作为base,
+ * 一些未覆盖的接口则使用base的，覆盖的则使用自己的，实现互补。例如:
+ *   ErrorEnv里则可以塞一个InMemoryEnv对象进来，ErrorEnv覆盖的一些函数则使用他自己的，其余的未覆盖成员函数使用InMemoryEnv的
  **/
 class LEVELDB_EXPORT EnvWrapper : public Env {
  public:
