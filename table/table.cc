@@ -70,7 +70,8 @@ namespace leveldb {
  *      key: last key of data block i <= key < first key of data block i + 1
  *      value: block handle of data block i
  *
- *  5.Footer的格式：
+ *  5.由于Meta Index Block和Index Block长度是可变的，所以需要在一个固定位置标记处其offset和长度
+ *  Footer的格式：
  *      offset    size        (metaindex_handle: meta index block handle)
  *      offset    size        (index_handle: index block handle)
  *          padding
@@ -97,8 +98,9 @@ struct Table::Rep {
 };
 
 /**
- * 读取table，读取除了data block之外的其他的block
- * 同时为data block维护了一个缓存block_cache，在读取data block中的key时，先去block_cache中查看该block是否存在
+ * 读取table，读取除了data block之外的其他的block到cache中
+ *
+ * data block维护有单独的缓存，叫block_cache. 在读取data block中的key时，先去block_cache中查看该block是否存在
  * 如果存在直接在缓存中查找，如果不存在，则加载该data block，并存入block_cache中
  * */
 Status Table::Open(const Options& options, RandomAccessFile* file,
