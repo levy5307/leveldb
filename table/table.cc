@@ -324,11 +324,11 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k, void* arg,
     FilterBlockReader* filter = rep_->filter;
     BlockHandle handle;
 
-    /** 先从meta block中查找，如果没有，则一定没有；如果能找到，则不一定有，需要去block再查找验证 */
+    /** 先从meta block(bloom filter)中查找，如果没有，则一定没有；如果能找到，则不一定有(假正率)，需要去block再查找验证 */
     if (filter != nullptr && handle.DecodeFrom(&handle_value).ok() &&
         /** 根据data block offset可以获取到meta block entry index, 从而判断该key是否存在 */
         !filter->KeyMayMatch(handle.offset(), k)) {
-        /** 若meta block中没有，一定没有 */
+        /** 若meta block(bloom filter)中没有，一定没有 */
       // Not found
     } else {
       /**
