@@ -95,6 +95,16 @@ struct LEVELDB_EXPORT Options {
   /**
    * block_cache集中管理, 这样便于控制大小
    * key=cache_id+handle offset; cache_id指定了具体的某一个table，handle offset指定了是哪一个data block
+   *
+   * block_cache如何保证获取到最新的值？
+   *   当调用写入时，数据是写到memtable里的，此时由于数据没有写入block，所以不影响block_cache。
+   * 在后面进行compaction后，数据才由memtable写入到block cache里。此时version set中添加一个新的version，
+   * 该新的version相对于老的version，删除了被合并的文件，添加合并后的文件。
+   *   由于block cache中的cache id代表文件id，所以compaction更新后，由于旧文件已经删除，所以不会再去访问该旧文件对应的cache
+   * 而访问到新文件时，由于该文件在block cache中没有缓存，则会创建一个新的cache放入block_cache中。无论如何都访问不到旧的cache
+   *   具体可参考代码：
+   *    1.DoCompactionWork() --> DBImpl::InstallCompactionResults()  在这里可以看到Compaction执行完之后删除旧文件和添加新文件
+   *    2.DBImpl::Get() --> Version::Get() --> TableCache::Get() --> Table::Open() 在Table::Open()里为该Table分配了一个单独的cache id
    **/
   Cache* block_cache = nullptr;
 
